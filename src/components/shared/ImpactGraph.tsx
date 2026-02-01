@@ -9,6 +9,20 @@ import { mockRisks } from '../../data/mockRisks'
 import { mockProcesses } from '../../data/mockProcesses'
 import { mockFSLineItems } from '../../data/mockFSLineItems'
 import { ExternalLink, X } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+
+type ViewMode =
+  | 'issue-cascade'
+  | 'control-focus'
+  | 'system-focus'
+  | 'all-systems'
+  | 'all-controls'
+  | 'all-risks'
+  | 'all-fs-items'
+  | 'all-processes'
+  | 'risk-focus'
+  | 'fs-focus'
+  | 'process-focus'
 
 interface Node {
   id: string
@@ -43,18 +57,56 @@ export default function ImpactGraph({
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
   const [showDetailCard, setShowDetailCard] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    // Initialize based on props
+    if (issueControlId) return 'issue-cascade'
+    if (focusControlId) return 'control-focus'
+    if (focusSystemId) return 'system-focus'
+    return 'all-controls'
+  })
+  const [focusEntityId, setFocusEntityId] = useState<string | undefined>(
+    issueControlId || focusControlId || focusSystemId
+  )
   const svgRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
-    // Build graph based on focus
-    if (issueControlId) {
-      buildIssueImpactGraph(issueControlId)
-    } else if (focusControlId) {
-      buildControlDependencyGraph(focusControlId)
-    } else if (focusSystemId) {
-      buildSystemImpactGraph(focusSystemId)
+    // Build graph based on view mode
+    switch (viewMode) {
+      case 'issue-cascade':
+        if (focusEntityId) buildIssueImpactGraph(focusEntityId)
+        break
+      case 'control-focus':
+        if (focusEntityId) buildControlDependencyGraph(focusEntityId)
+        break
+      case 'system-focus':
+        if (focusEntityId) buildSystemImpactGraph(focusEntityId)
+        break
+      case 'risk-focus':
+        if (focusEntityId) buildRiskImpactGraph(focusEntityId)
+        break
+      case 'fs-focus':
+        if (focusEntityId) buildFSItemImpactGraph(focusEntityId)
+        break
+      case 'process-focus':
+        if (focusEntityId) buildProcessImpactGraph(focusEntityId)
+        break
+      case 'all-systems':
+        buildAllSystemsGraph()
+        break
+      case 'all-controls':
+        buildAllControlsGraph()
+        break
+      case 'all-risks':
+        buildAllRisksGraph()
+        break
+      case 'all-fs-items':
+        buildAllFSItemsGraph()
+        break
+      case 'all-processes':
+        buildAllProcessesGraph()
+        break
     }
-  }, [focusControlId, focusSystemId, issueControlId])
+  }, [viewMode, focusEntityId])
 
   const buildIssueImpactGraph = (controlId: string) => {
     const affectedControl = mockControls.find(c => c.id === controlId)
@@ -257,6 +309,319 @@ export default function ImpactGraph({
     setEdges(newEdges)
   }
 
+  const buildRiskImpactGraph = (riskId: string) => {
+    const risk = mockRisks.find(r => r.id === riskId)
+    if (!risk) return
+
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Center: The risk
+    newNodes.push({
+      id: risk.id,
+      label: risk.name.substring(0, 20),
+      type: 'risk',
+      status: risk.level === 'HIGH' ? 'warning' : 'ok',
+      x: 400,
+      y: 250,
+      data: risk
+    })
+
+    // All controls mitigating this risk
+    const controls = mockControls.filter(c => c.riskIds.includes(risk.id))
+    controls.forEach((control, idx) => {
+      const angle = (Math.PI * 2 * idx) / controls.length
+      newNodes.push({
+        id: control.id,
+        label: control.id,
+        type: 'control',
+        status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: control
+      })
+      newEdges.push({ from: risk.id, to: control.id })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildFSItemImpactGraph = (fsId: string) => {
+    const fsItem = mockFSLineItems.find(f => f.id === fsId)
+    if (!fsItem) return
+
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Center: The FS line item
+    newNodes.push({
+      id: fsItem.id,
+      label: fsItem.name,
+      type: 'fs',
+      status: fsItem.materiality === 'HIGH' ? 'warning' : 'ok',
+      x: 400,
+      y: 250,
+      data: fsItem
+    })
+
+    // All controls covering this FS item
+    const controls = mockControls.filter(c => c.fsLineItemIds.includes(fsItem.id))
+    controls.forEach((control, idx) => {
+      const angle = (Math.PI * 2 * idx) / controls.length
+      newNodes.push({
+        id: control.id,
+        label: control.id,
+        type: 'control',
+        status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: control
+      })
+      newEdges.push({ from: fsItem.id, to: control.id })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildProcessImpactGraph = (processId: string) => {
+    const process = mockProcesses.find(p => p.id === processId)
+    if (!process) return
+
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Center: The process
+    newNodes.push({
+      id: process.id,
+      label: process.name.substring(0, 15),
+      type: 'process',
+      status: 'ok',
+      x: 400,
+      y: 250,
+      data: process
+    })
+
+    // All controls in this process
+    const controls = mockControls.filter(c => c.processIds.includes(process.id))
+    controls.forEach((control, idx) => {
+      const angle = (Math.PI * 2 * idx) / controls.length
+      newNodes.push({
+        id: control.id,
+        label: control.id,
+        type: 'control',
+        status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: control
+      })
+      newEdges.push({ from: process.id, to: control.id })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildAllSystemsGraph = () => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Create a circular layout for all systems
+    mockSystems.slice(0, 12).forEach((system, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.min(mockSystems.length, 12)
+      newNodes.push({
+        id: system.id,
+        label: system.name,
+        type: 'system',
+        status: system.criticality === 'HIGH' ? 'warning' : 'ok',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: system
+      })
+
+      // Show a few controls for each system (max 2)
+      const controls = mockControls.filter(c => c.systemIds.includes(system.id)).slice(0, 2)
+      controls.forEach((control, cIdx) => {
+        const nodeId = `${control.id}-${system.id}`
+        const offsetAngle = angle + ((cIdx - 0.5) * 0.3)
+        newNodes.push({
+          id: nodeId,
+          label: control.id,
+          type: 'control',
+          status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+          x: 400 + Math.cos(offsetAngle) * 300,
+          y: 250 + Math.sin(offsetAngle) * 300,
+          data: control
+        })
+        newEdges.push({ from: system.id, to: nodeId })
+      })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildAllControlsGraph = () => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Create a circular layout for controls
+    mockControls.slice(0, 15).forEach((control, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.min(mockControls.length, 15)
+      newNodes.push({
+        id: control.id,
+        label: control.id,
+        type: 'control',
+        status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+        x: 400 + Math.cos(angle) * 220,
+        y: 250 + Math.sin(angle) * 220,
+        data: control
+      })
+
+      // Show connected systems
+      control.systemIds.slice(0, 1).forEach(systemId => {
+        const system = mockSystems.find(s => s.id === systemId)
+        if (system) {
+          const systemNodeId = `${system.id}-${control.id}`
+          if (!newNodes.find(n => n.id === system.id || n.id === systemNodeId)) {
+            const offsetAngle = angle + 0.15
+            newNodes.push({
+              id: systemNodeId,
+              label: system.name.substring(0, 12),
+              type: 'system',
+              status: 'ok',
+              x: 400 + Math.cos(offsetAngle) * 140,
+              y: 250 + Math.sin(offsetAngle) * 140,
+              data: system
+            })
+            newEdges.push({ from: control.id, to: systemNodeId })
+          }
+        }
+      })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildAllRisksGraph = () => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Create a circular layout for risks
+    mockRisks.slice(0, 10).forEach((risk, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.min(mockRisks.length, 10)
+      newNodes.push({
+        id: risk.id,
+        label: risk.name.substring(0, 15),
+        type: 'risk',
+        status: risk.level === 'HIGH' ? 'warning' : 'ok',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: risk
+      })
+
+      // Show controls mitigating this risk
+      const controls = mockControls.filter(c => c.riskIds.includes(risk.id)).slice(0, 2)
+      controls.forEach((control, cIdx) => {
+        const nodeId = `${control.id}-${risk.id}`
+        const offsetAngle = angle + ((cIdx - 0.5) * 0.3)
+        newNodes.push({
+          id: nodeId,
+          label: control.id,
+          type: 'control',
+          status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+          x: 400 + Math.cos(offsetAngle) * 100,
+          y: 250 + Math.sin(offsetAngle) * 100,
+          data: control
+        })
+        newEdges.push({ from: risk.id, to: nodeId })
+      })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildAllFSItemsGraph = () => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Create a circular layout for FS items
+    mockFSLineItems.slice(0, 12).forEach((fsItem, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.min(mockFSLineItems.length, 12)
+      newNodes.push({
+        id: fsItem.id,
+        label: fsItem.name,
+        type: 'fs',
+        status: fsItem.materiality === 'HIGH' ? 'warning' : 'ok',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: fsItem
+      })
+
+      // Show controls for this FS item
+      const controls = mockControls.filter(c => c.fsLineItemIds.includes(fsItem.id)).slice(0, 2)
+      controls.forEach((control, cIdx) => {
+        const nodeId = `${control.id}-${fsItem.id}`
+        const offsetAngle = angle + ((cIdx - 0.5) * 0.3)
+        newNodes.push({
+          id: nodeId,
+          label: control.id,
+          type: 'control',
+          status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+          x: 400 + Math.cos(offsetAngle) * 300,
+          y: 250 + Math.sin(offsetAngle) * 300,
+          data: control
+        })
+        newEdges.push({ from: fsItem.id, to: nodeId })
+      })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
+  const buildAllProcessesGraph = () => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+
+    // Create a circular layout for processes
+    mockProcesses.slice(0, 10).forEach((process, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.min(mockProcesses.length, 10)
+      newNodes.push({
+        id: process.id,
+        label: process.name.substring(0, 15),
+        type: 'process',
+        status: 'ok',
+        x: 400 + Math.cos(angle) * 200,
+        y: 250 + Math.sin(angle) * 200,
+        data: process
+      })
+
+      // Show controls in this process
+      const controls = mockControls.filter(c => c.processIds.includes(process.id)).slice(0, 2)
+      controls.forEach((control, cIdx) => {
+        const nodeId = `${control.id}-${process.id}`
+        const offsetAngle = angle + ((cIdx - 0.5) * 0.3)
+        newNodes.push({
+          id: nodeId,
+          label: control.id,
+          type: 'control',
+          status: control.effectiveness === 'EFFECTIVE' ? 'ok' : control.effectiveness === 'INEFFECTIVE' ? 'critical' : 'warning',
+          x: 400 + Math.cos(offsetAngle) * 300,
+          y: 250 + Math.sin(offsetAngle) * 300,
+          data: control
+        })
+        newEdges.push({ from: process.id, to: nodeId })
+      })
+    })
+
+    setNodes(newNodes)
+    setEdges(newEdges)
+  }
+
   const handleMouseDown = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setDraggedNode(nodeId)
@@ -309,22 +674,73 @@ export default function ImpactGraph({
   const handleViewConnections = () => {
     if (!selectedNode) return
 
-    if (selectedNode.type === 'system' && onRequestSystemGraph) {
-      onRequestSystemGraph(selectedNode.id)
-    } else if (selectedNode.type === 'control') {
-      buildControlDependencyGraph(selectedNode.data.id)
-      setShowDetailCard(false)
+    // Switch to focused view for this node type
+    setFocusEntityId(selectedNode.data.id)
+
+    switch (selectedNode.type) {
+      case 'system':
+        setViewMode('system-focus')
+        break
+      case 'control':
+        setViewMode('control-focus')
+        break
+      case 'risk':
+        setViewMode('risk-focus')
+        break
+      case 'fs':
+        setViewMode('fs-focus')
+        break
+      case 'process':
+        setViewMode('process-focus')
+        break
     }
+
+    setShowDetailCard(false)
   }
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm">
-          {issueControlId && '🔴 Issue Impact Cascade - Click nodes for details'}
-          {focusControlId && '📊 Control Dependencies - Drag to reposition'}
-          {focusSystemId && '⚙️ System Impact Analysis'}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">
+            Network Graph View
+          </CardTitle>
+          <Select value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-controls">All Controls</SelectItem>
+              <SelectItem value="all-systems">All Systems</SelectItem>
+              <SelectItem value="all-risks">All Risks</SelectItem>
+              <SelectItem value="all-fs-items">All FS Items</SelectItem>
+              <SelectItem value="all-processes">All Processes</SelectItem>
+              {focusEntityId && (
+                <>
+                  <SelectItem value="control-focus">Focus: Control</SelectItem>
+                  <SelectItem value="system-focus">Focus: System</SelectItem>
+                  <SelectItem value="risk-focus">Focus: Risk</SelectItem>
+                  <SelectItem value="fs-focus">Focus: FS Item</SelectItem>
+                  <SelectItem value="process-focus">Focus: Process</SelectItem>
+                  <SelectItem value="issue-cascade">Issue Cascade</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          {viewMode === 'issue-cascade' && '🔴 Issue Impact Cascade - See what breaks when a control fails'}
+          {viewMode === 'control-focus' && '📊 Control Dependencies - What this control depends on and protects'}
+          {viewMode === 'system-focus' && '⚙️ System Impact - All controls using this system'}
+          {viewMode === 'risk-focus' && '⚠️ Risk Coverage - Controls mitigating this risk'}
+          {viewMode === 'fs-focus' && '💰 FS Item Coverage - Controls protecting this line item'}
+          {viewMode === 'process-focus' && '🔄 Process Controls - Controls within this process'}
+          {viewMode === 'all-controls' && '📋 All Controls - Overview of control relationships'}
+          {viewMode === 'all-systems' && '🖥️ All Systems - Systems and their controls'}
+          {viewMode === 'all-risks' && '🎯 All Risks - Risks and mitigation controls'}
+          {viewMode === 'all-fs-items' && '📊 All FS Items - Financial statements and controls'}
+          {viewMode === 'all-processes' && '⚙️ All Processes - Processes and their controls'}
+        </p>
       </CardHeader>
       <CardContent>
         <div className="relative">
@@ -540,17 +956,15 @@ export default function ImpactGraph({
                   </>
                 )}
 
-                {(selectedNode.type === 'system' || selectedNode.type === 'control') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleViewConnections}
-                    className="w-full mt-2"
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View All Connections
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleViewConnections}
+                  className="w-full mt-2"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View All Connections
+                </Button>
               </div>
             </div>
           )}
