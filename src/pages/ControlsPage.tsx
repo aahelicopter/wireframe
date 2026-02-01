@@ -140,6 +140,12 @@ export default function ControlsPage() {
         onMapFrameworks={() => {
           setShowMappingModal(true)
         }}
+        onUpdateControl={(updatedControl) => {
+          setControls((prev) =>
+            prev.map((c) => (c.id === updatedControl.id ? updatedControl : c))
+          )
+          setSelectedControl(updatedControl)
+        }}
       />
 
       <FrameworkMappingModal

@@ -8,16 +8,19 @@ import {
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { mockSystems } from '../../data/mockSystems'
 import { mockRisks } from '../../data/mockRisks'
 import { mockProcesses } from '../../data/mockProcesses'
 import { mockFSLineItems } from '../../data/mockFSLineItems'
+import RelationshipEditor from './RelationshipEditor'
 
 interface ControlDetailModalProps {
   control: Control | null
   open: boolean
   onClose: () => void
   onMapFrameworks?: () => void
+  onUpdateControl?: (control: Control) => void
 }
 
 export default function ControlDetailModal({
@@ -25,6 +28,7 @@ export default function ControlDetailModal({
   open,
   onClose,
   onMapFrameworks,
+  onUpdateControl,
 }: ControlDetailModalProps) {
   if (!control) return null
 
@@ -134,90 +138,108 @@ export default function ControlDetailModal({
           {/* Section 4: Relationships */}
           <div>
             <h3 className="font-semibold text-lg mb-3">Relationships</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Systems */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Systems ({systems.length})</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {systems.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No systems</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {systems.map((system) => (
-                        <li key={system.id} className="text-xs">
-                          • {system.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+            <Tabs defaultValue="view">
+              <TabsList>
+                <TabsTrigger value="view">View</TabsTrigger>
+                <TabsTrigger value="edit">Edit Relationships</TabsTrigger>
+              </TabsList>
 
-              {/* Risks */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Risks ({risks.length})</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {risks.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No risks</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {risks.map((risk) => (
-                        <li key={risk.id} className="text-xs flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs px-1 py-0">
-                            {risk.level}
-                          </Badge>
-                          {risk.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+              <TabsContent value="view" className="mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Systems */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Systems ({systems.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {systems.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No systems</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {systems.map((system) => (
+                            <li key={system.id} className="text-xs">
+                              • {system.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
 
-              {/* Processes */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Processes ({processes.length})</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {processes.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No processes</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {processes.map((process) => (
-                        <li key={process.id} className="text-xs">
-                          • {process.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+                  {/* Risks */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Risks ({risks.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {risks.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No risks</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {risks.map((risk) => (
+                            <li key={risk.id} className="text-xs flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs px-1 py-0">
+                                {risk.level}
+                              </Badge>
+                              {risk.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
 
-              {/* FS Line Items */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">FS Line Items ({fsLineItems.length})</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {fsLineItems.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No FS line items</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {fsLineItems.map((fs) => (
-                        <li key={fs.id} className="text-xs">
-                          • {fs.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  {/* Processes */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Processes ({processes.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {processes.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No processes</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {processes.map((process) => (
+                            <li key={process.id} className="text-xs">
+                              • {process.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* FS Line Items */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">FS Line Items ({fsLineItems.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {fsLineItems.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No FS line items</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {fsLineItems.map((fs) => (
+                            <li key={fs.id} className="text-xs">
+                              • {fs.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="edit" className="mt-4">
+                {onUpdateControl && (
+                  <RelationshipEditor
+                    control={control}
+                    onUpdate={onUpdateControl}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 
