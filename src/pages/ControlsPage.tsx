@@ -3,9 +3,11 @@ import { mockControls } from '../data/mockControls'
 import { Control } from '../types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Badge } from '../components/ui/badge'
+import ControlDetailModal from '../components/controls/ControlDetailModal'
 
 export default function ControlsPage() {
   const [selectedControl, setSelectedControl] = useState<Control | null>(null)
+  const [showMappingModal, setShowMappingModal] = useState(false)
 
   const getFrameworkBadgeColor = (framework: string) => {
     switch (framework) {
@@ -95,6 +97,15 @@ export default function ControlsPage() {
       <div className="mt-4 text-sm text-muted-foreground">
         Showing {mockControls.length} controls
       </div>
+
+      <ControlDetailModal
+        control={selectedControl}
+        open={!!selectedControl}
+        onClose={() => setSelectedControl(null)}
+        onMapFrameworks={() => {
+          setShowMappingModal(true)
+        }}
+      />
     </div>
   )
 }
