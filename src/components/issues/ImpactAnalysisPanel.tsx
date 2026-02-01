@@ -13,6 +13,7 @@ import { mockRisks } from '../../data/mockRisks'
 import { mockSystems } from '../../data/mockSystems'
 import { mockFSLineItems } from '../../data/mockFSLineItems'
 import { AlertCircle } from 'lucide-react'
+import ImpactGraph from '../shared/ImpactGraph'
 
 interface ImpactAnalysisPanelProps {
   issue: Issue | null
@@ -99,6 +100,9 @@ export default function ImpactAnalysisPanel({
         </DialogHeader>
 
         <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+          {/* Visual Impact Graph */}
+          <ImpactGraph issueControlId={issue.controlId} />
+
           {/* Direct Impact */}
           <Card className="border-red-300 bg-red-50">
             <CardHeader className="pb-3">

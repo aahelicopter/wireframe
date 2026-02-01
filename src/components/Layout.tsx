@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, ClipboardCheck, AlertCircle, DollarSign, Network } from 'lucide-react'
+import { LayoutDashboard, FileText, ClipboardCheck, AlertCircle, DollarSign } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode
@@ -15,7 +15,6 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/tests', label: 'Tests', icon: ClipboardCheck },
     { path: '/issues', label: 'Issues', icon: AlertCircle },
     { path: '/fs-line-items', label: 'Financial Statements', icon: DollarSign },
-    { path: '/network-graph', label: 'Network Graph', icon: Network },
   ]
 
   return (

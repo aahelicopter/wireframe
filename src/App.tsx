@@ -6,7 +6,6 @@ import TestsPage from './pages/TestsPage'
 import IssuesPage from './pages/IssuesPage'
 import FSLineItemsPage from './pages/FSLineItemsPage'
 import FSLineItemDetailPage from './pages/FSLineItemDetailPage'
-import NetworkGraphPage from './pages/NetworkGraphPage'
 
 function App() {
   return (
@@ -20,7 +19,6 @@ function App() {
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/fs-line-items" element={<FSLineItemsPage />} />
           <Route path="/fs-line-items/:id" element={<FSLineItemDetailPage />} />
-          <Route path="/network-graph" element={<NetworkGraphPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

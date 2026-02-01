@@ -14,6 +14,7 @@ import { mockRisks } from '../../data/mockRisks'
 import { mockProcesses } from '../../data/mockProcesses'
 import { mockFSLineItems } from '../../data/mockFSLineItems'
 import RelationshipEditor from './RelationshipEditor'
+import ImpactGraph from '../shared/ImpactGraph'
 
 interface ControlDetailModalProps {
   control: Control | null
@@ -142,6 +143,7 @@ export default function ControlDetailModal({
               <TabsList>
                 <TabsTrigger value="view">View</TabsTrigger>
                 <TabsTrigger value="edit">Edit Relationships</TabsTrigger>
+                <TabsTrigger value="graph">Impact Graph</TabsTrigger>
               </TabsList>
 
               <TabsContent value="view" className="mt-4">
@@ -238,6 +240,10 @@ export default function ControlDetailModal({
                     onUpdate={onUpdateControl}
                   />
                 )}
+              </TabsContent>
+
+              <TabsContent value="graph" className="mt-4">
+                <ImpactGraph focusControlId={control.id} />
               </TabsContent>
             </Tabs>
           </div>
