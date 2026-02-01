@@ -15,7 +15,7 @@ export const mockIssues: Issue[] = [
     assignedTo: 'Sarah Chen',
     resolution: 'Admin accounts immediately disabled. Updated termination checklist to include contractor verification. Enhanced monthly access review to flag contractor accounts.',
     resolvedDate: '2024-08-25',
-    affectedSystemIds: ['SYS-001', 'SYS-003'], // Salesforce, AWS
+    affectedSystemIds: ['sys-2', 'sys-4'], // Salesforce, Active Directory
     failedAttribute: 'Access Termination',
     failedCapability: 'User Offboarding Process',
   },
@@ -34,7 +34,7 @@ export const mockIssues: Issue[] = [
     assignedTo: 'David Kim',
     resolution: undefined,
     resolvedDate: undefined,
-    affectedSystemIds: ['SYS-002', 'SYS-005'], // NetSuite, Stripe
+    affectedSystemIds: ['sys-6', 'sys-5'], // NetSuite, Oracle Database
     failedAttribute: 'Access Governance',
     failedCapability: 'Least Privilege Enforcement',
   },
@@ -51,7 +51,7 @@ export const mockIssues: Issue[] = [
     assignedTo: 'David Kim',
     resolution: 'Removed conflicting access for all 5 users. Implemented monthly automated SOD conflict reporting. Updated role design to prevent future conflicts.',
     resolvedDate: '2024-07-28',
-    affectedSystemIds: ['SYS-002'], // NetSuite (SAP-like system)
+    affectedSystemIds: ['sys-6'], // NetSuite (SAP-like system)
     failedAttribute: 'Segregation of Duties',
     failedCapability: 'Role-Based Access Control',
   },
@@ -70,7 +70,7 @@ export const mockIssues: Issue[] = [
     assignedTo: 'Michael Torres',
     resolution: 'Variance traced to timing difference on wire transfer. Updated reconciliation procedures to include same-day variance investigation requirement. Added automated alerts for variances >$10K.',
     resolvedDate: '2024-08-05',
-    affectedSystemIds: ['SYS-005', 'SYS-009'], // Stripe, Banking Portal
+    affectedSystemIds: ['sys-5', 'sys-1'], // Oracle Database, SAP ERP
     failedAttribute: 'Reconciliation Process',
     failedCapability: 'Timely Variance Investigation',
   },
@@ -87,7 +87,7 @@ export const mockIssues: Issue[] = [
     assignedTo: 'Michael Torres',
     resolution: undefined,
     resolvedDate: undefined,
-    affectedSystemIds: ['SYS-002'], // NetSuite (AR system)
+    affectedSystemIds: ['sys-6'], // NetSuite (AR system)
     failedAttribute: 'Review Timing',
     failedCapability: 'Periodic Review Process',
   },

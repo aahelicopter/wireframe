@@ -136,7 +136,7 @@ export default function ImpactGraph({
     const failedCapability = issue?.failedCapability
 
     // Ring 1: Only the SPECIFIC systems that had the issue (YELLOW - at risk)
-    const affectedSystems = mockSystems.filter(s => affectedSystemIds.includes(s.id.toUpperCase()) || affectedSystemIds.includes(s.id.toLowerCase()))
+    const affectedSystems = mockSystems.filter(s => affectedSystemIds.includes(s.id))
 
     affectedSystems.forEach((system, idx) => {
       const angle = (Math.PI * 2 * idx) / Math.max(affectedSystems.length, 1)
@@ -162,7 +162,7 @@ export default function ImpactGraph({
 
           // Check if this control has systemAttributes matching the affected system and attribute
           const hasMatchingAttribute = c.systemAttributes?.some(sa =>
-            (sa.systemId === system.id.toUpperCase() || sa.systemId === system.id.toLowerCase()) &&
+            sa.systemId === system.id &&
             sa.attributes.some(attr =>
               attr === failedAttribute || attr === failedCapability
             )
@@ -173,9 +173,7 @@ export default function ImpactGraph({
       } else {
         // Fallback: If no granular data, show any controls on this system (old behavior)
         cascadeControls = mockControls.filter(
-          c => c.id !== affectedControl.id && c.systemIds.some(sId =>
-            sId.toLowerCase() === system.id.toLowerCase()
-          )
+          c => c.id !== affectedControl.id && c.systemIds.includes(system.id)
         )
       }
 
