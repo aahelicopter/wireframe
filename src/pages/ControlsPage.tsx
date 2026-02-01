@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { mockControls } from '../data/mockControls'
+import { mockFrameworkRequirements } from '../data/mockFrameworkRequirements'
 import { Control } from '../types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Badge } from '../components/ui/badge'
 import ControlDetailModal from '../components/controls/ControlDetailModal'
+import FrameworkMappingModal from '../components/controls/FrameworkMappingModal'
 
 export default function ControlsPage() {
+  const [controls, setControls] = useState<Control[]>(mockControls)
   const [selectedControl, setSelectedControl] = useState<Control | null>(null)
   const [showMappingModal, setShowMappingModal] = useState(false)
 
@@ -33,6 +36,38 @@ export default function ControlsPage() {
     }
   }
 
+  const handleSaveMapping = (requirementIds: string[]) => {
+    if (!selectedControl) return
+
+    // Convert requirement IDs to FrameworkMapping objects
+    const newMappings = requirementIds.map((reqId) => {
+      const requirement = mockFrameworkRequirements.find((r) => r.id === reqId)
+      if (!requirement) return null
+
+      return {
+        requirementId: reqId,
+        framework: requirement.framework,
+        requirementTitle: requirement.title,
+        mappedDate: new Date().toISOString().split('T')[0],
+        mappedBy: selectedControl.owner,
+      }
+    }).filter((m) => m !== null)
+
+    // Update the control in the list
+    setControls((prev) =>
+      prev.map((c) =>
+        c.id === selectedControl.id
+          ? { ...c, frameworkRequirements: newMappings as any }
+          : c
+      )
+    )
+
+    // Update the selected control to reflect changes immediately
+    setSelectedControl((prev) =>
+      prev ? { ...prev, frameworkRequirements: newMappings as any } : null
+    )
+  }
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -55,7 +90,7 @@ export default function ControlsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockControls.map((control) => (
+            {controls.map((control) => (
               <TableRow
                 key={control.id}
                 className="cursor-pointer"
@@ -95,16 +130,23 @@ export default function ControlsPage() {
       </div>
 
       <div className="mt-4 text-sm text-muted-foreground">
-        Showing {mockControls.length} controls
+        Showing {controls.length} controls
       </div>
 
       <ControlDetailModal
         control={selectedControl}
-        open={!!selectedControl}
+        open={!!selectedControl && !showMappingModal}
         onClose={() => setSelectedControl(null)}
         onMapFrameworks={() => {
           setShowMappingModal(true)
         }}
+      />
+
+      <FrameworkMappingModal
+        control={selectedControl}
+        open={showMappingModal}
+        onClose={() => setShowMappingModal(false)}
+        onSave={handleSaveMapping}
       />
     </div>
   )
