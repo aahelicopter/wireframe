@@ -132,6 +132,12 @@ export interface Control {
   processIds: string[];
   fsLineItemIds: string[];
 
+  // Granular dependencies - what attributes/capabilities this control relies on
+  systemAttributes?: {
+    systemId: string;
+    attributes: string[]; // e.g., ["Access Termination", "User Provisioning", "Audit Logging"]
+  }[];
+
   // Metadata
   createdDate: string;
   lastUpdated: string;
@@ -167,6 +173,11 @@ export interface Issue {
   assignedTo?: string;
   resolution?: string;
   resolvedDate?: string;
+
+  // Granular failure tracking
+  affectedSystemIds?: string[]; // Which systems had the issue
+  failedAttribute?: string; // What specifically failed (e.g., "Access Termination", "SOD Controls")
+  failedCapability?: string; // The capability that broke (e.g., "User Provisioning", "Reconciliation")
 }
 
 // Impact Analysis Result

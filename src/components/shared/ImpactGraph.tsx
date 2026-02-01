@@ -8,6 +8,7 @@ import { mockSystems } from '../../data/mockSystems'
 import { mockRisks } from '../../data/mockRisks'
 import { mockProcesses } from '../../data/mockProcesses'
 import { mockFSLineItems } from '../../data/mockFSLineItems'
+import { mockIssues } from '../../data/mockIssues'
 import { ExternalLink, X } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
@@ -112,6 +113,9 @@ export default function ImpactGraph({
     const affectedControl = mockControls.find(c => c.id === controlId)
     if (!affectedControl) return
 
+    // Find the issue for this control to get granular failure details
+    const issue = mockIssues.find(i => i.controlId === controlId)
+
     const newNodes: Node[] = []
     const newEdges: Edge[] = []
 
@@ -126,46 +130,75 @@ export default function ImpactGraph({
       data: affectedControl
     })
 
-    // Systems this control depends on (YELLOW - at risk)
-    const systems = mockSystems.filter(s => affectedControl.systemIds.includes(s.id))
-    systems.forEach((system, idx) => {
-      const angle = (Math.PI * 2 * idx) / systems.length
+    // Get the specific systems that had the issue (granular)
+    const affectedSystemIds = issue?.affectedSystemIds || affectedControl.systemIds
+    const failedAttribute = issue?.failedAttribute
+    const failedCapability = issue?.failedCapability
+
+    // Ring 1: Only the SPECIFIC systems that had the issue (YELLOW - at risk)
+    const affectedSystems = mockSystems.filter(s => affectedSystemIds.includes(s.id.toUpperCase()) || affectedSystemIds.includes(s.id.toLowerCase()))
+
+    affectedSystems.forEach((system, idx) => {
+      const angle = (Math.PI * 2 * idx) / Math.max(affectedSystems.length, 1)
+      const systemNodeId = `system-${system.id}`
       newNodes.push({
-        id: system.id,
-        label: system.name,
+        id: systemNodeId,
+        label: `${system.name}`,
         type: 'system',
         status: 'warning',
         x: 400 + Math.cos(angle) * 180,
         y: 250 + Math.sin(angle) * 180,
-        data: system
+        data: { ...system, failedAttribute, failedCapability }
       })
-      newEdges.push({ from: affectedControl.id, to: system.id })
+      newEdges.push({ from: affectedControl.id, to: systemNodeId })
 
-      // OTHER controls on this same system (YELLOW - cascade risk)
-      const relatedControls = mockControls.filter(
-        c => c.id !== affectedControl.id && c.systemIds.includes(system.id)
-      )
+      // Ring 2: OTHER controls that depend on this system AND the SAME attribute (GRANULAR CASCADE)
+      let cascadeControls: typeof mockControls = []
 
-      relatedControls.slice(0, 2).forEach((control, cIdx) => {
-        const controlId = `${control.id}-${system.id}`
-        const offsetAngle = angle + ((cIdx + 1) * Math.PI / 6)
+      if (failedAttribute && issue) {
+        // GRANULAR: Find controls that depend on this system for the SAME attribute
+        cascadeControls = mockControls.filter(c => {
+          if (c.id === affectedControl.id) return false
+
+          // Check if this control has systemAttributes matching the affected system and attribute
+          const hasMatchingAttribute = c.systemAttributes?.some(sa =>
+            (sa.systemId === system.id.toUpperCase() || sa.systemId === system.id.toLowerCase()) &&
+            sa.attributes.some(attr =>
+              attr === failedAttribute || attr === failedCapability
+            )
+          )
+
+          return hasMatchingAttribute
+        })
+      } else {
+        // Fallback: If no granular data, show any controls on this system (old behavior)
+        cascadeControls = mockControls.filter(
+          c => c.id !== affectedControl.id && c.systemIds.some(sId =>
+            sId.toLowerCase() === system.id.toLowerCase()
+          )
+        )
+      }
+
+      cascadeControls.slice(0, 3).forEach((control, cIdx) => {
+        const controlNodeId = `cascade-${control.id}-${system.id}-${cIdx}`
+        const offsetAngle = angle + ((cIdx - 1) * Math.PI / 8)
         newNodes.push({
-          id: controlId,
+          id: controlNodeId,
           label: control.id,
           type: 'control',
           status: 'warning',
-          x: 400 + Math.cos(offsetAngle) * 280,
-          y: 250 + Math.sin(offsetAngle) * 280,
+          x: 400 + Math.cos(offsetAngle) * 300,
+          y: 250 + Math.sin(offsetAngle) * 300,
           data: control
         })
-        newEdges.push({ from: system.id, to: controlId })
+        newEdges.push({ from: systemNodeId, to: controlNodeId })
       })
     })
 
-    // Exposed risks (RED)
+    // Ring 3: Exposed risks (RED)
     const risks = mockRisks.filter(r => affectedControl.riskIds.includes(r.id))
     risks.forEach((risk, idx) => {
-      const angle = Math.PI + (Math.PI * 2 * idx) / risks.length
+      const angle = Math.PI + (Math.PI * 2 * idx) / Math.max(risks.length, 1)
       newNodes.push({
         id: risk.id,
         label: risk.name.substring(0, 20),
@@ -729,7 +762,7 @@ export default function ImpactGraph({
           </Select>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          {viewMode === 'issue-cascade' && '🔴 Issue Impact Cascade - See what breaks when a control fails'}
+          {viewMode === 'issue-cascade' && '🔴 Issue Impact Cascade - Granular attribute-level analysis: Shows which SPECIFIC system capabilities failed and ONLY controls that depend on those same attributes'}
           {viewMode === 'control-focus' && '📊 Control Dependencies - What this control depends on and protects'}
           {viewMode === 'system-focus' && '⚙️ System Impact - All controls using this system'}
           {viewMode === 'risk-focus' && '⚠️ Risk Coverage - Controls mitigating this risk'}
@@ -845,6 +878,19 @@ export default function ImpactGraph({
               <div className="space-y-3 text-sm">
                 {selectedNode.type === 'system' && (
                   <>
+                    {selectedNode.data.failedAttribute && (
+                      <div className="mb-3 p-2 bg-orange-50 border border-orange-200">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-orange-700">⚠️ FAILED ATTRIBUTE</span>
+                        </div>
+                        <p className="text-sm font-semibold">{selectedNode.data.failedAttribute}</p>
+                        {selectedNode.data.failedCapability && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Capability: {selectedNode.data.failedCapability}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <span className="text-muted-foreground">Description:</span>
                       <p className="mt-1">{selectedNode.data.description}</p>
