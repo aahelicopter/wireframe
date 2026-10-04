@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
 import { PriceStatusButton } from './components/PriceStatus'
+import { HaltBanner, KillSwitchButton } from './components/KillSwitch'
 import { useAppState } from './lib/store'
 import { indexTree } from './engine/tree'
 import { ThesisTree } from './components/ThesisTree'
@@ -96,6 +97,7 @@ export default function App() {
             <input className="input !w-32 num" type="number" step={10000} value={state.settings.capital}
               onChange={(e) => updateSettings({ capital: Math.max(0, Number(e.target.value)) })} />
           </label>
+          <KillSwitchButton agent={agent} />
           <PriceStatusButton store={store} />
           <div className="flex items-center gap-3">
             <span className="text-[12px] muted num hidden md:inline">
@@ -120,6 +122,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-[1440px] px-4 py-5">
+        <HaltBanner agent={agent} />
         {stale && tab !== 'settings' && tab !== 'news' && tab !== 'today' && (
           <div className="mb-4 card px-4 py-2.5 flex items-center justify-between gap-3 text-[13px]" style={{ borderColor: 'var(--warn)' }}>
             <span>You changed the thesis or settings. Hit <b>Run</b> to rebuild the plan.</span>

@@ -147,9 +147,12 @@ export function ReviewView({ store, agent, running, result, onRun, onOpenNode }:
         <div className="card">
           <div className="px-4 pt-4 pb-2 flex flex-wrap items-center gap-2">
             <h3 className="text-[15px] font-semibold mr-auto">Orders awaiting approval ({proposed.length})</h3>
-            <span className="text-[12px] muted num">buys {usdK(sum(proposed, 'BUY'))} · sells {usdK(sum(proposed, 'SELL'))}</span>
+            <span className="text-[12px] muted num" title="Suggested daily buy budget (guidance, set in Settings)">
+              buys {usdK(sum(proposed, 'BUY'))} of {usdK(state.trading.suggestMaxDailyUsd)} suggested/day · sells {usdK(sum(proposed, 'SELL'))}
+            </span>
             <button className="btn" disabled={!selected.size} onClick={() => setStatus(selected, 'rejected')}><X size={14} /> Reject</button>
-            <button className="btn btn-primary" disabled={!selected.size} onClick={() => setStatus(selected, 'approved')}><Check size={14} /> Approve {selected.size || ''}</button>
+            <button className="btn btn-primary" disabled={!selected.size || state.trading.halted} title={state.trading.halted ? 'Kill switch is on' : ''}
+              onClick={() => setStatus(selected, 'approved')}><Check size={14} /> Approve {selected.size || ''}</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px] num min-w-[760px]">

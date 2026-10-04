@@ -16,6 +16,9 @@ export interface AgentLink {
   brokerPositions: { at: string; positions: BrokerPosition[] } | null
   log: { at: string; msg: string }[]
   token: string | null
+  /** Kill switch as the server sees it (includes a .data/HALT file). */
+  halt: { on: boolean; reason: string; by: string }
+  setHalt: (on: boolean, reason?: string) => Promise<void>
   applyBrokerPositions: () => void
   dismissBrokerPositions: () => void
 }
@@ -34,6 +37,20 @@ export function useAgentSync(store: Store): AgentLink {
   const [brokerPositions, setBrokerPositions] = useState<AgentLink['brokerPositions']>(null)
   const [log, setLog] = useState<AgentLink['log']>([])
   const [token, setToken] = useState<string | null>(null)
+  const [halt, setHaltState] = useState<AgentLink['halt']>({ on: false, reason: '', by: '' })
+
+  /** Mirror the server's switch into local state so reviews also stop proposing orders. */
+  const mirrorHalt = useCallback(
+    (h: AgentLink['halt']) => {
+      setHaltState(h)
+      update((cur) =>
+        cur.trading.halted === h.on && (cur.trading.haltReason ?? '') === h.reason
+          ? {}
+          : { trading: { ...cur.trading, halted: h.on, haltReason: h.reason } },
+      )
+    },
+    [update],
+  )
   const clearBroker = useRef(false)
 
   const sync = useCallback(async () => {
@@ -46,12 +63,14 @@ export function useAgentSync(store: Store): AgentLink {
           orders: s.orders,
           brief: s.review.brief && s.review.lastRunAt ? { at: s.review.lastRunAt, markdown: s.review.brief } : null,
           clearBrokerPositions: clearBroker.current,
+          guards: { maxQuoteAgeMin: s.trading.maxQuoteAgeMin, maxDriftPct: s.trading.maxDriftPct },
         }),
       })
       if (!res.ok) throw new Error(String(res.status))
       clearBroker.current = false
-      const body = (await res.json()) as { orders: Order[]; brokerPositions: AgentLink['brokerPositions']; lastAgentAt: string | null; log: AgentLink['log'] }
+      const body = (await res.json()) as { orders: Order[]; brokerPositions: AgentLink['brokerPositions']; lastAgentAt: string | null; log: AgentLink['log']; halt: AgentLink['halt'] }
       setOnline(true)
+      mirrorHalt(body.halt)
       setLastAgentAt(body.lastAgentAt)
       setBrokerPositions(body.brokerPositions)
       setLog(body.log)
@@ -73,12 +92,26 @@ export function useAgentSync(store: Store): AgentLink {
     } catch {
       setOnline(false)
     }
-  }, [store.stateRef, update])
+  }, [store.stateRef, update, mirrorHalt])
+
+  const setHalt = useCallback(
+    async (on: boolean, reason = '') => {
+      // Apply locally first so the app stops proposing even if the server is down.
+      update((cur) => ({ trading: { ...cur.trading, halted: on, haltReason: reason } }))
+      try {
+        const res = await fetch('/api/agent/halt', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on, reason }) })
+        if (res.ok) mirrorHalt(((await res.json()) as { halt: AgentLink['halt'] }).halt)
+      } catch {
+        setHaltState({ on, reason, by: 'app' })
+      }
+    },
+    [update, mirrorHalt],
+  )
 
   // Push on every order or brief change, and poll for agent updates.
   useEffect(() => {
     void sync()
-  }, [state.orders, state.review.brief, sync])
+  }, [state.orders, state.review.brief, state.trading.maxQuoteAgeMin, state.trading.maxDriftPct, sync])
   useEffect(() => {
     const id = setInterval(() => document.visibilityState === 'visible' && void sync(), POLL_MS)
     return () => clearInterval(id)
@@ -114,5 +147,5 @@ export function useAgentSync(store: Store): AgentLink {
     void sync()
   }, [sync])
 
-  return { online, lastAgentAt, brokerPositions, log, token, applyBrokerPositions, dismissBrokerPositions }
+  return { online, lastAgentAt, brokerPositions, log, token, halt, setHalt, applyBrokerPositions, dismissBrokerPositions }
 }

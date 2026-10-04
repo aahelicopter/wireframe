@@ -20,9 +20,36 @@ Every agent call needs `Authorization: Bearer <token>`. Copy the token, or a rea
 | GET | `/brief` | Latest review as Markdown, plus live order status. Add `?format=json` for JSON. |
 | GET | `/orders` | Approved, unexpired orders only, with execution instructions. |
 | POST | `/orders/{id}` | Report progress: `{"status":"sent","brokerOrderId":"…"}`, `{"status":"filled","fill":{"qty":10,"avgPrice":101.2}}` or `{"status":"failed","note":"why"}` |
+| POST | `/orders/{id}/precheck` | `{"price":101.2,"quoteTime":"<ISO>"}` returns `{ok}` or `{ok:false, reason}`. Required within 3 minutes before reporting `sent`. |
+| POST | `/halt` | `{"reason":"…"}` turns the kill switch **on**. Agents can never turn it off. |
 | PUT | `/positions` | Push broker holdings: `{"positions":[{"ticker":"LITE","shares":12,"avgCost":98.2}]}`. The app asks you before using them. |
 
 Each order has `side` (BUY/SELL), `ticker`, `qty` (shares, fractional only if you turned that on), `limitPrice`, `expiresAt`, `reason` and `kind` (tranche / trim / exit).
+
+## Kill switch
+
+- **App:** the red **Kill switch** button in the header, which works instantly. Resume from the same button.
+- **Agent:** `POST /halt` if it sees anything odd. Only you can resume.
+- **Disk:** create `ai-thesis/.data/HALT`, optionally with a reason inside. It works even if the UI is broken; delete the file to resume.
+
+While halted, `GET /orders` returns nothing to place, plus a `cancel` list of orders still open at the broker. Prechecks fail, `sent` is refused, reviews propose no orders, and approvals are disabled.
+
+## Price guards (enforced by `/precheck`)
+
+An order is refused if any of these hold:
+- the kill switch is on;
+- the market is outside regular hours (Mon–Fri 9:30–16:00 New York; exchange holidays aren't modeled, and Robinhood rejects those);
+- the quote is older than **15 min**;
+- the price moved more than **3%** from the price when the order was proposed;
+- a buy's ask is above its limit/guard, or a sell's bid is below it.
+
+Change the 15 min and 3% defaults in Settings → Trading agent.
+
+These checks only work if the agent calls `/precheck` before placing the order with Robinhood. The server refuses to mark an order `sent` without a recent passing precheck, which makes skipping it visible right away. It can't physically stop an agent that ignores the protocol from calling Robinhood directly, so keep Robinhood's own Agentic-account limits on too.
+
+## Suggested limits (guidance only)
+
+Each review sizes proposals to stay under a suggested **max per order** and **max buys per day** (defaults $1,500 and $3,000 for a $15k start). Anything over the daily budget rolls to later reviews. You can still approve, edit or exceed these; they only shape what's proposed.
 
 ## Guarantees enforced by the server
 

@@ -43,6 +43,8 @@ export function buildOrders(
   /** From currentPeriodStart(): orders since then count against this period's tranche. */
   periodStart: string,
   signals: Signals = { tickers: {}, nodes: {} },
+  /** When prices were last fetched. Proposals are not built from stale prices. */
+  quotesAt: string | null = null,
   now = new Date(),
 ): OrderBuild {
   const byTicker = new Map(companies.map((c) => [c.ticker, c]))
@@ -56,11 +58,30 @@ export function buildOrders(
   const skipped: OrderBuild['skipped'] = []
   const buffer = trading.limitBufferPct / 100
 
+  if (trading.halted) {
+    return { orders, skipped: [{ ticker: 'ALL', reason: `Kill switch is on${trading.haltReason ? ` (${trading.haltReason})` : ''}. No orders proposed.` }] }
+  }
+  const maxAgeMs = trading.maxQuoteAgeMin * 60000
+  if (!quotesAt || now.getTime() - new Date(quotesAt).getTime() > maxAgeMs) {
+    return { orders, skipped: [{ ticker: 'ALL', reason: `Prices are older than ${trading.maxQuoteAgeMin} minutes. Refresh prices and re-run the review.` }] }
+  }
+  // Suggested daily buy budget, counting buys already approved/sent/filled today.
+  const today = now.toISOString().slice(0, 10)
+  let budgetLeft =
+    trading.suggestMaxDailyUsd -
+    existing
+      .filter((o) => o.side === 'BUY' && LIVE.includes(o.status) && (o.approvedAt ?? o.createdAt).slice(0, 10) === today)
+      .reduce((a, o) => a + o.notional, 0)
+
   const make = (side: Order['side'], ticker: string, dollars: number, kind: Order['kind'], reason: string, maxQty?: number) => {
     const c = byTicker.get(ticker)
     if (c && !c.usListed) return skipped.push({ ticker, reason: 'Non-US listing, not tradable on a US broker. Buy manually or via an ADR.' })
     const q = quotes[ticker]
     if (!q) return skipped.push({ ticker, reason: 'No live price. Refresh prices first.' })
+    // A last trade days old means a halt, delisting or bad symbol, not just a weekend.
+    if (now.getTime() - new Date(q.time).getTime() > 4 * 86400000) {
+      return skipped.push({ ticker, reason: `Last trade ${q.time.slice(0, 10)}. Price looks stale, skipping.` })
+    }
     const price = q.priceUsd
     // Robinhood takes up to 6 decimals on fractional (market) orders.
     let qty = trading.fractional ? Math.floor((dollars / price) * 1e6) / 1e6 : Math.floor(dollars / price)
@@ -87,8 +108,13 @@ export function buildOrders(
 
   // Buys from the current tranche.
   for (const b of tranche?.buys ?? []) {
-    const due = b.amount - already(b.ticker, 'BUY')
+    let due = b.amount - already(b.ticker, 'BUY')
     if (due <= 0) continue
+    if (budgetLeft < trading.minOrderUsd) {
+      skipped.push({ ticker: b.ticker, reason: `Over today's suggested $${trading.suggestMaxDailyUsd.toLocaleString()} buy budget. It will come up in a later review.` })
+      continue
+    }
+    due = Math.min(due, trading.suggestMaxOrderUsd, budgetLeft)
     // Strongly negative news pauses new buying until the signal fades or you rethink the thesis.
     const sig = signals.tickers[b.ticker] ?? 0
     if (sig <= PAUSE_BELOW) {
@@ -96,7 +122,9 @@ export function buildOrders(
       continue
     }
     const r = plan.recommendations.find((x) => x.ticker === b.ticker)
+    const before = orders.length
     make('BUY', b.ticker, due, 'tranche', `Tranche 1 of the plan (${r?.action === 'ADD' ? 'adding to' : 'starting'} a ${r?.targetPct.toFixed(1) ?? '?'}% target)`)
+    if (orders.length > before) budgetLeft -= orders[orders.length - 1].notional
   }
 
   const held = new Map<string, Position>()

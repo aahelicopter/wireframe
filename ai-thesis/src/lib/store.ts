@@ -8,11 +8,12 @@ import type { AiModel, UsageSink } from './claude'
 import { fetchQuotes, type Quote } from './prices'
 
 export const DEFAULT_SETTINGS: Settings = {
-  capital: 500_000,
+  capital: 15_000,
   weights: { conviction: 5, bottleneck: 4, beta: 3, depth: 3, purity: 3, smallCap: 1, catalyst: 2, news: 2 },
-  numPositions: 20,
-  maxPositionPct: 8,
-  minPositionPct: 1.5,
+  // Sized for a $15k start: fewer, larger positions so each buy is meaningful.
+  numPositions: 12,
+  maxPositionPct: 12,
+  minPositionPct: 4,
   maxBranchPct: 40,
   cashReservePct: 5,
   concentration: 2,
@@ -48,6 +49,20 @@ export interface AppState {
   review: Review
 }
 
+export const DEFAULT_TRADING: Trading = {
+  // Small accounts need fractional shares (e.g. LITE trades above $1,000). Robinhood sends
+  // these as market orders, so the stale-price and drift guards below protect them.
+  fractional: true,
+  limitBufferPct: 0.5,
+  exitOnThesisBreak: true,
+  minOrderUsd: 25,
+  suggestMaxOrderUsd: 1500,
+  suggestMaxDailyUsd: 3000,
+  maxQuoteAgeMin: 15,
+  maxDriftPct: 3,
+  halted: false,
+}
+
 export const EMPTY_USAGE: AiUsage = { calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, searches: 0, costUsd: 0 }
 
 export interface PriceStatus {
@@ -58,6 +73,15 @@ export interface PriceStatus {
 const REFRESH_MS = 5 * 60 * 1000
 
 const KEY = 'ai-thesis-portfolio:v1'
+
+/** The first version defaulted to a $500k book; starting size is now $15k. */
+function migrateSettings(saved?: Partial<Settings>): Settings {
+  const merged = { ...DEFAULT_SETTINGS, ...saved, weights: { ...DEFAULT_SETTINGS.weights, ...saved?.weights } }
+  if (saved?.capital === 500_000) {
+    return { ...merged, capital: DEFAULT_SETTINGS.capital, numPositions: DEFAULT_SETTINGS.numPositions, maxPositionPct: DEFAULT_SETTINGS.maxPositionPct, minPositionPct: DEFAULT_SETTINGS.minPositionPct }
+  }
+  return merged
+}
 
 function load(): AppState {
   const fresh: AppState = {
@@ -75,7 +99,7 @@ function load(): AppState {
     seen: {},
     proposals: [],
     orders: [],
-    trading: { fractional: false, limitBufferPct: 0.5, exitOnThesisBreak: true, minOrderUsd: 100 },
+    trading: DEFAULT_TRADING,
     review: { cadenceDays: 1, lastRunAt: null, autoRun: true },
   }
   try {
@@ -85,7 +109,7 @@ function load(): AppState {
     return {
       ...fresh,
       ...saved,
-      settings: { ...DEFAULT_SETTINGS, ...saved.settings, weights: { ...DEFAULT_SETTINGS.weights, ...saved.settings?.weights } },
+      settings: migrateSettings(saved.settings),
       trading: { ...fresh.trading, ...saved.trading },
       review: { ...fresh.review, ...saved.review },
       aiUsage: { ...EMPTY_USAGE, ...saved.aiUsage },

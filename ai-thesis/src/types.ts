@@ -206,6 +206,15 @@ export interface Trading {
   exitOnThesisBreak: boolean
   /** Skip orders smaller than this. */
   minOrderUsd: number
+  /** Guidance for the recommender: proposed orders are sized to stay under these. Not enforced on approval. */
+  suggestMaxOrderUsd: number
+  suggestMaxDailyUsd: number
+  /** Hard guards, enforced by the local agent API before an order may be sent. */
+  maxQuoteAgeMin: number
+  maxDriftPct: number
+  /** Kill switch. Also settable by creating ai-thesis/.data/HALT. */
+  halted: boolean
+  haltReason?: string
 }
 
 export interface Review {

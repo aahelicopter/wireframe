@@ -107,7 +107,21 @@ export function SettingsView({ store, agent }: { store: Store; agent: AgentLink 
             <label className="flex items-center justify-between gap-3">Smallest order
               <span className="flex items-center gap-1">$<input className="input !w-24 text-right" type="number" step="50" min={0} value={t.minOrderUsd} onChange={(e) => setTrading({ minOrderUsd: Number(e.target.value) })} /></span>
             </label>
-            <p className="text-[11.5px] muted">Trims only appear if "Allow trims" is on in the Plan tab.</p>
+            <div className="label pt-2">Guidance for proposals (you still approve every order)</div>
+            <label className="flex items-center justify-between gap-3">Suggested max per order
+              <span className="flex items-center gap-1">$<input className="input !w-24 text-right" type="number" step="100" min={0} value={t.suggestMaxOrderUsd} onChange={(e) => setTrading({ suggestMaxOrderUsd: Number(e.target.value) })} /></span>
+            </label>
+            <label className="flex items-center justify-between gap-3">Suggested max buys per day
+              <span className="flex items-center gap-1">$<input className="input !w-24 text-right" type="number" step="100" min={0} value={t.suggestMaxDailyUsd} onChange={(e) => setTrading({ suggestMaxDailyUsd: Number(e.target.value) })} /></span>
+            </label>
+            <div className="label pt-2">Hard guards (the agent API refuses orders that fail these)</div>
+            <label className="flex items-center justify-between gap-3">Refuse if quote is older than
+              <span className="flex items-center gap-1"><input className="input !w-20 text-right" type="number" step="1" min={1} value={t.maxQuoteAgeMin} onChange={(e) => setTrading({ maxQuoteAgeMin: Number(e.target.value) })} />min</span>
+            </label>
+            <label className="flex items-center justify-between gap-3">Refuse if price moved more than
+              <span className="flex items-center gap-1"><input className="input !w-20 text-right" type="number" step="0.5" min={0.5} value={t.maxDriftPct} onChange={(e) => setTrading({ maxDriftPct: Number(e.target.value) })} />%</span>
+            </label>
+            <p className="text-[11.5px] muted">Orders are also refused outside regular market hours and while the kill switch is on. Trims only appear if "Allow trims" is on in the Plan tab.</p>
           </div>
           <div className="space-y-2 text-[13px]">
             <div className="label">Connect your agent</div>
@@ -146,18 +160,21 @@ App API: ${origin}/api/agent  (header: Authorization: Bearer ${token})
 Robinhood account: the one account get_accounts lists as tradable by you (my Agentic account). Never use any other account for orders.
 
 Each run:
-1. GET /status. If approvedOrders is 0, skip to step 4.
-2. GET /orders. For EACH order listed, and nothing else:
-   a. get_equity_tradability for the symbol. If it isn't tradable, POST /orders/{id} {"status":"failed","note":"not tradable"}.
-   b. get_equity_quotes. BUY: if ask > limitPrice, mark failed with note "price above guard". SELL: if bid < limitPrice, mark failed.
-   c. review_equity_order with exactly: side, symbol=ticker, quantity=qty, time_in_force="gfd", market_hours="regular_hours",
+1. GET /status.
+   - If halted is true: GET /orders, cancel every order in its "cancel" list with cancel_equity_order, POST /orders/{id} {"status":"failed","note":"cancelled: kill switch"} (or "filled" if it already filled), then STOP.
+   - If marketOpen is false: skip to step 3.
+2. GET /orders. For EACH order listed, and nothing else, in this order:
+   a. get_equity_tradability. If not tradable: POST /orders/{id} {"status":"failed","note":"not tradable"}.
+   b. get_equity_quotes. Use the ask for BUY, the bid for SELL, and that quote's time.
+   c. POST /orders/{id}/precheck {"price":<that price>,"quoteTime":"<ISO time of the quote>"}. If ok is false, POST {"status":"failed","note":<reason>} and do NOT place it. The app refuses stale quotes, big price moves, closed markets and the kill switch.
+   d. review_equity_order with exactly: side, symbol=ticker, quantity=qty, time_in_force="gfd", market_hours="regular_hours",
       and type="limit" + limit_price=limitPrice when orderType is "limit", or type="market" (no limit_price) when orderType is "market".
-      If the review returns any alert (buying power, PDT, halt), mark failed with the alert text. Don't place it.
-   d. place_equity_order with the same parameters and ref_id = the order's id (it is a UUID; reuse it on retries).
-   e. POST /orders/{id} {"status":"sent","brokerOrderId":"<robinhood order id>"}.
+      If the review returns any alert (buying power, PDT, halt), mark failed with the alert text.
+   e. place_equity_order with the same parameters and ref_id = the order's id (a UUID; reuse it on retries). Do this within 3 minutes of the precheck.
+   f. POST /orders/{id} {"status":"sent","brokerOrderId":"<robinhood order id>"}.
 3. For orders you sent earlier, get_equity_orders with order_id. When filled, POST /orders/{id} {"status":"filled","fill":{"qty":<filled qty>,"avgPrice":<average price>},"brokerOrderId":"..."}. If cancelled or rejected, POST failed with the reason.
 4. get_equity_positions for the Agentic account, then PUT /positions {"positions":[{"ticker":..,"shares":..,"avgCost":average_buy_price}]}.
 5. GET /brief and send me a short summary.
 
-Rules: never place an order that isn't returned by GET /orders. Never change side, qty, type or limit. If anything is unclear, mark the order failed with a note instead of improvising.`
+Rules: never place an order that isn't returned by GET /orders or that failed its precheck. Never change side, qty, type or limit. If anything looks wrong (unexpected fills, errors you don't understand, prices that make no sense), POST /halt {"reason":"..."} and stop. You can turn the kill switch on, but never off.`
 }

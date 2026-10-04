@@ -1,6 +1,6 @@
 # AI Thesis Portfolio
 
-A personal tool for building a high-beta AI portfolio (default $500k) from a supply-chain thesis. It starts at GPUs and follows the chain down to the physical bottlenecks under them, for example:
+A personal tool for building a high-beta AI portfolio (default $15k starting book, scalable) from a supply-chain thesis. It starts at GPUs and follows the chain down to the physical bottlenecks under them, for example:
 
 `AI buildout → Networking → Optical transceivers → Lasers (EML/CW) → Indium phosphide wafers → Indium supply / MOCVD tools`
 
@@ -68,7 +68,9 @@ Token usage and estimated cost are tracked in Settings. A typical review with ~3
 
 ## Orders and your broker
 
-Reviews turn the current tranche (plus trims and thesis-break exits, if enabled) into **proposed** limit orders. You approve them on the Today tab. A trading agent with your brokerage connection (for example Robinhood) picks up only the approved orders from the local API, places them and reports fills, which update your positions. See [AGENT.md](AGENT.md) for the protocol and safety rules. You can also execute by hand and click **Mark filled**.
+Reviews turn the current tranche (plus trims and thesis-break exits, if enabled) into **proposed** limit orders. You approve them on the Today tab. A trading agent with your brokerage connection (for example Robinhood) picks up only the approved orders from the local API, places them and reports fills, which update your positions. See [AGENT.md](AGENT.md) for the protocol and safety rules.
+
+**Guardrails:** a kill switch (header button, the agent's `POST /halt`, or a `.data/HALT` file), hard price guards checked before every order (stale quote over 15 min, price move over 3%, market closed), and suggested per-order and per-day buy sizes that shape proposals without blocking your approvals. You can also execute by hand and click **Mark filled**.
 
 ## Data and caveats
 

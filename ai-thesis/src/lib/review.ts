@@ -119,7 +119,7 @@ export async function runReview(store: Store, onStep: (s: ReviewStep) => void): 
   s = store.stateRef.current // pick up price updates and usage
   const plan = runPlan(s.nodes, s.companies, s.positions, s.settings, buildSignals(scored))
   const kept = s.orders.filter((o) => o.status !== 'proposed')
-  const built = buildOrders(plan, s.positions, s.companies, s.quotes, kept, s.trading, currentPeriodStart(s.settings), buildSignals(scored))
+  const built = buildOrders(plan, s.positions, s.companies, s.quotes, kept, s.trading, currentPeriodStart(s.settings), buildSignals(scored), s.quotesAt)
   const orders = [...kept, ...built.orders]
   const brief = buildBrief(store, plan, orders, scored, proposals, built.skipped)
 
@@ -159,6 +159,7 @@ function buildBrief(
   const invested = s.positions.reduce((a, p) => a + marketValue(p), 0)
   const L: string[] = []
   L.push(`# AI thesis review, ${today}`, '')
+  if (s.trading.halted) L.push(`> **KILL SWITCH ON**${s.trading.haltReason ? `: ${s.trading.haltReason}` : ''}. No orders will be served to the agent.`, '')
   L.push(`Invested ${money(invested)} of ${money(Math.max(s.settings.capital, invested))}. Plan: ${plan.recommendations.filter((r) => r.targetValue > 0).length} names, ${money(plan.totalBuys)} still to deploy.`, '')
 
   const pending = orders.filter((o) => o.status === 'proposed')
