@@ -6,6 +6,8 @@ A personal tool for building a high-beta AI portfolio (default $15k starting boo
 
 It is built for gradual, thesis-driven accumulation over 12–24 months, not trading.
 
+**Going live with real money? Follow [GO_LIVE.md](GO_LIVE.md).**
+
 ## Run it
 
 ```bash

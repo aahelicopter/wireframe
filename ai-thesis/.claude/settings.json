@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__robinhood__get_accounts",
+      "mcp__robinhood__get_portfolio",
+      "mcp__robinhood__get_equity_positions",
+      "mcp__robinhood__get_equity_quotes",
+      "mcp__robinhood__get_equity_tradability",
+      "mcp__robinhood__get_equity_orders",
+      "mcp__robinhood__review_equity_order",
+      "mcp__Robinhood__get_accounts",
+      "mcp__Robinhood__get_portfolio",
+      "mcp__Robinhood__get_equity_positions",
+      "mcp__Robinhood__get_equity_quotes",
+      "mcp__Robinhood__get_equity_tradability",
+      "mcp__Robinhood__get_equity_orders",
+      "mcp__Robinhood__review_equity_order"
+    ],
+    "ask": [
+      "mcp__robinhood__place_equity_order",
+      "mcp__robinhood__cancel_equity_order",
+      "mcp__Robinhood__place_equity_order",
+      "mcp__Robinhood__cancel_equity_order"
+    ],
+    "deny": [
+      "mcp__robinhood__place_option_order",
+      "mcp__robinhood__place_crypto_order",
+      "mcp__robinhood__exercise_option",
+      "mcp__robinhood__cancel_option_order",
+      "mcp__robinhood__cancel_crypto_order",
+      "mcp__robinhood__cancel_option_exercise",
+      "mcp__Robinhood__place_option_order",
+      "mcp__Robinhood__place_crypto_order",
+      "mcp__Robinhood__exercise_option",
+      "mcp__Robinhood__cancel_option_order",
+      "mcp__Robinhood__cancel_crypto_order",
+      "mcp__Robinhood__cancel_option_exercise"
+    ]
+  }
+}
