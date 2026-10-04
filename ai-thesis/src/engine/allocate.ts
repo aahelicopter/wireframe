@@ -6,6 +6,7 @@ import type {
   Recommendation,
   ScoredCompany,
   Settings,
+  Signals,
   ThesisNode,
   Timing,
   Tranche,
@@ -20,6 +21,7 @@ export const FACTOR_LABELS: Record<FactorKey, { label: string; hint: string }> =
   purity: { label: 'AI purity', hint: 'Share of the business tied to the AI buildout' },
   smallCap: { label: 'Small-cap tilt', hint: 'Favor smaller, less-owned names' },
   catalyst: { label: 'Near-term catalyst', hint: 'Favor theses expected to show up in numbers soon' },
+  news: { label: 'News flow', hint: 'Favor names and layers with supportive recent news (needs a daily review with AI scoring)' },
 }
 
 const CAP_SCORE = { mega: 0, large: 0.33, mid: 0.67, small: 1 } as const
@@ -36,6 +38,7 @@ export function scoreCompanies(
   idx: TreeIndex,
   settings: Settings,
   heldTickers: Set<string>,
+  signals: Signals = { tickers: {}, nodes: {} },
 ): ScoredCompany[] {
   const w = settings.weights
   const wSum = Object.values(w).reduce((a, b) => a + b, 0) || 1
@@ -64,6 +67,7 @@ export function scoreCompanies(
       purity: clamp(c.purity),
       smallCap: CAP_SCORE[c.cap],
       catalyst: bestTiming,
+      news: newsFactor(c.ticker, active.map((e) => e.nodeId), signals),
     }
     let composite = 0
     for (const k of Object.keys(factors) as FactorKey[]) composite += w[k] * factors[k]
@@ -151,16 +155,44 @@ function addMonths(iso: string, months: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** 0..1, 0.5 = no news. Ticker news counts 70%, its thesis layers 30%. */
+function newsFactor(ticker: string, nodeIds: string[], signals: Signals) {
+  const t = signals.tickers[ticker] ?? 0
+  const ns = nodeIds.map((id) => signals.nodes[id]).filter((v): v is number => v !== undefined)
+  const n = ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0
+  return clamp(0.5 + 0.5 * (0.7 * t + 0.3 * n))
+}
+
+function monthsBetween(fromIso: string, to: Date) {
+  const f = new Date(fromIso + 'T00:00:00')
+  return (to.getFullYear() - f.getFullYear()) * 12 + (to.getMonth() - f.getMonth()) - (to.getDate() < f.getDate() ? 1 : 0)
+}
+
+/** First day of the current buying period (month or quarter since the plan start). */
+export function currentPeriodStart(settings: Settings, now = new Date()): string {
+  const step = settings.cadence === 'monthly' ? 1 : 3
+  const todayIso = now.toISOString().slice(0, 10)
+  if (settings.startDate >= todayIso) return settings.startDate
+  const k = Math.floor(Math.max(0, monthsBetween(settings.startDate, now)) / step)
+  return addMonths(settings.startDate, k * step)
+}
+
 function buildTranches(
   recs: Recommendation[],
   idx: TreeIndex,
   settings: Settings,
 ): Tranche[] {
   const step = settings.cadence === 'monthly' ? 1 : 3
-  const T = Math.max(1, Math.round(settings.horizonMonths / step))
+  // Schedule from today over whatever is left of the horizon, so the plan
+  // compresses as time passes instead of restarting.
+  const today = new Date()
+  const todayIso = today.toISOString().slice(0, 10)
+  const elapsed = Math.max(0, monthsBetween(settings.startDate, today))
+  const start = settings.startDate > todayIso ? settings.startDate : todayIso
+  const T = Math.max(1, Math.round((settings.horizonMonths - elapsed) / step))
   const tranches: Tranche[] = Array.from({ length: T }, (_, i) => ({
     index: i,
-    date: addMonths(settings.startDate, i * step),
+    date: addMonths(start, i * step),
     buys: [],
     total: 0,
   }))
@@ -209,6 +241,7 @@ function explain(
     { v: settings.weights.purity * s.factors.purity, text: `~${Math.round(c.purity * 100)}% AI exposure` },
     { v: settings.weights.smallCap * s.factors.smallCap, text: `${c.cap}-cap, less crowded` },
     { v: settings.weights.catalyst * s.factors.catalyst, text: `catalyst window: ${node.timing}` },
+    { v: settings.weights.news * Math.max(0, s.factors.news - 0.5) * 2, text: 'supportive recent news' },
   ]
   drivers.sort((a, b) => b.v - a.v)
   why.push(`Scores well on: ${drivers.slice(0, 3).map((d) => d.text).join(', ')}.`)
@@ -223,6 +256,7 @@ function explain(
     `Target ${rec.targetPct.toFixed(1)}% (${fmtK(rec.targetValue)}), you hold ${fmtK(rec.currentValue)}.` +
       (rec.gap > 0 ? ` Build ${fmtK(rec.gap)} over the plan.` : ''),
   )
+  if (s.factors.news <= 0.35) why.push('News flow has turned negative. Check the Today tab before adding.')
   if (c.note) why.push(`Watch: ${c.note}`)
   return why
 }
@@ -232,6 +266,7 @@ export function runPlan(
   companies: Company[],
   positions: Position[],
   settings: Settings,
+  signals?: Signals,
 ): PlanResult {
   const idx = indexTree(nodes)
   const holdings = new Map<string, number>()
@@ -241,7 +276,7 @@ export function runPlan(
     holdings.set(t, (holdings.get(t) ?? 0) + marketValue(p))
   }
   const currentTotal = [...holdings.values()].reduce((a, b) => a + b, 0)
-  const scored = scoreCompanies(companies, idx, settings, new Set(holdings.keys()))
+  const scored = scoreCompanies(companies, idx, settings, new Set(holdings.keys()), signals)
   const selected = scored.slice(0, Math.max(1, settings.numPositions))
   const selectedSet = new Set(selected.map((s) => s.company.ticker))
 

@@ -8,6 +8,7 @@ import { WeightsPanel } from './WeightsPanel'
 import { NewsBox } from './NewsBox'
 import { DayChange } from './PriceStatus'
 import type { Quote } from '../lib/prices'
+import type { AiCtx } from '../lib/claude'
 
 const ACTION_STYLE: Record<Action, { label: string; color: string }> = {
   BUY: { label: 'Buy', color: 'var(--good)' },
@@ -88,7 +89,7 @@ export function PlanView({ store, onOpenNode }: { store: Store; onOpenNode: (id:
         <div className="space-y-2">
           {recs.map((r) => (
             <RecCard key={r.ticker} r={r} total={total} color={r.scored ? colors[r.scored.branchId] : 'var(--muted)'}
-              chain={r.scored ? pathTo(idx, r.scored.primaryNodeId).slice(1) : []} apiKey={state.apiKey} quote={state.quotes[r.ticker]} onOpenNode={onOpenNode} />
+              chain={r.scored ? pathTo(idx, r.scored.primaryNodeId).slice(1) : []} ai={store.ai} quote={state.quotes[r.ticker]} onOpenNode={onOpenNode} />
           ))}
           {recs.length === 0 && <p className="muted text-[13px]">Nothing matches this filter.</p>}
         </div>
@@ -107,8 +108,8 @@ function Tile({ label, value, sub }: { label: string; value: string; sub: string
   )
 }
 
-function RecCard({ r, total, color, chain, apiKey, quote, onOpenNode }: {
-  r: Recommendation; total: number; color: string; chain: { id: string; label: string }[]; apiKey: string; quote?: Quote; onOpenNode: (id: string) => void
+function RecCard({ r, total, color, chain, ai, quote, onOpenNode }: {
+  r: Recommendation; total: number; color: string; chain: { id: string; label: string }[]; ai: AiCtx; quote?: Quote; onOpenNode: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const c = r.scored?.company
@@ -157,7 +158,7 @@ function RecCard({ r, total, color, chain, apiKey, quote, onOpenNode }: {
             {chain.map((n) => <button key={n.id} className="chip hover:underline" onClick={() => onOpenNode(n.id)}>{n.label}</button>)}
           </div>
           {c && (
-            <NewsBox apiKey={apiKey} subject={`${c.name} (${c.ticker})`}
+            <NewsBox ai={ai} subject={`${c.name} (${c.ticker})`}
               context={r.why.slice(0, 2).join(' ')}
               query={`"${c.name}"`}
               company={{ ticker: c.ticker, yahoo: c.yahoo, usListed: c.usListed }}

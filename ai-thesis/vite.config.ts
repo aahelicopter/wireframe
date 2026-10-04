@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
+import { agentApi } from './server/agentApi'
 
 // Browsers can't call these free data sources directly (CORS), so the
 // dev/preview server forwards requests to them. No API keys involved.
@@ -25,8 +26,9 @@ export default defineConfig(({ mode }) => {
     '/api/sec': forward('/api/sec', 'https://www.sec.gov', secAgent),
   }
   return {
-    plugins: [react()],
-    server: { host: true, port: 5174, proxy },
-    preview: { port: 5174, proxy },
+    plugins: [react(), agentApi()],
+    // Localhost only: the agent API can queue trades, so don't expose it on the LAN.
+    server: { host: '127.0.0.1', port: 5174, proxy },
+    preview: { host: '127.0.0.1', port: 5174, proxy },
   }
 })

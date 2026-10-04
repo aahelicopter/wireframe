@@ -36,7 +36,7 @@ export function NodePanel({ store, nodeId, onSelect, onHoverCompany }: Props) {
     setAi({ busy: true, err: '', subs: null })
     try {
       const subs = await digDeeper(
-        state.apiKey,
+        store.ai,
         path.map((p) => p.label),
         `${node.summary} Bottleneck: ${node.bottleneck}`,
         state.companies.map((c) => c.ticker),
@@ -228,7 +228,7 @@ export function NodePanel({ store, nodeId, onSelect, onHoverCompany }: Props) {
       <div>
         <div className="label mb-1.5">News & research</div>
         <NewsBox
-          apiKey={state.apiKey}
+          ai={store.ai}
           subject={`${node.label} (${node.newsQuery})`}
           context={`${path.map((p) => p.label).join(' → ')}. ${node.summary}`}
           query={node.newsQuery}

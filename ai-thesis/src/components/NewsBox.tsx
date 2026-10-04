@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, FileText, Loader2, Sparkles } from 'lucide-react'
-import { describeError, findNews, type NewsItem } from '../lib/claude'
+import { describeError, thesisRead, type AiCtx, type ThesisRead } from '../lib/claude'
 import { newsUrl } from '../lib/format'
+import { headlineId } from '../engine/signals'
+import type { ScoredHeadline } from '../types'
 import { gather, googleNews, secFilings, timeAgo, yahooHeadlines, type Headline } from '../lib/news'
 
 interface Props {
-  apiKey: string
+  ai: AiCtx
   subject: string
   context: string
   /** Google News search terms. */
@@ -16,10 +18,10 @@ interface Props {
 }
 
 /** Free headlines that load on open, plus an optional paid AI news scan. */
-export function NewsBox({ apiKey, subject, context, query, company, extraLinks = [] }: Props) {
+export function NewsBox({ ai: aiCtx, subject, context, query, company, extraLinks = [] }: Props) {
   const [free, setFree] = useState<{ loading: boolean; items: Headline[]; failed: number }>({ loading: true, items: [], failed: 0 })
   const [showAll, setShowAll] = useState(false)
-  const [ai, setAi] = useState<NewsItem[] | null>(null)
+  const [ai, setAi] = useState<ThesisRead | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -40,7 +42,8 @@ export function NewsBox({ apiKey, subject, context, query, company, extraLinks =
     setBusy(true)
     setErr('')
     try {
-      setAi(await findNews(apiKey, subject, context))
+      // Reuses the free headlines above: no web search, low effort.
+      setAi(await thesisRead(aiCtx, subject, context, free.items))
     } catch (e) {
       setErr(describeError(e))
     } finally {
@@ -82,8 +85,8 @@ export function NewsBox({ apiKey, subject, context, query, company, extraLinks =
         <button
           className="link inline-flex items-center gap-1 disabled:opacity-50"
           onClick={scan}
-          disabled={!apiKey || busy}
-          title={apiKey ? 'Claude searches the web and says what each story means for the thesis (uses your API credits)' : 'Add an Anthropic API key in Settings to enable'}
+          disabled={!aiCtx.apiKey || busy || free.items.length === 0}
+          title={aiCtx.apiKey ? 'Claude reads the headlines above and says what they mean for the thesis (uses your API credits, no web search)' : 'Add an Anthropic API key in Settings to enable'}
         >
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
           {busy ? 'Analyzing…' : 'AI thesis read (paid)'}
@@ -91,36 +94,51 @@ export function NewsBox({ apiKey, subject, context, query, company, extraLinks =
       </div>
       {err && <p className="text-[12px]" style={{ color: 'var(--bad)' }}>{err}</p>}
       {ai && (
-        <ul className="space-y-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
-          {ai.length === 0 && <li className="muted text-[12px]">Nothing relevant found.</li>}
-          {ai.map((i) => (
-            <li key={i.url} className="text-[12.5px] leading-snug">
-              <a className="link font-medium" href={i.url} target="_blank" rel="noreferrer">{i.title}</a>
-              <span className="muted"> · {i.source}{i.date ? ` · ${i.date}` : ''}</span>
-              {i.takeaway && <div className="ink2">{i.takeaway}</div>}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-[12.5px]">{ai.summary}</p>
+          <ul className="space-y-1.5">
+            {ai.items.filter((i) => free.items[i.n]).map((i) => (
+              <li key={i.n} className="text-[12.5px] leading-snug flex gap-1.5">
+                <ImpactBadge impact={i.impact} />
+                <div>
+                  <a className="link" href={free.items[i.n].url} target="_blank" rel="noreferrer">{free.items[i.n].title}</a>
+                  <div className="ink2">{i.takeaway}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
 }
 
-export function HeadlineList({ items, showTag = false }: { items: Headline[]; showTag?: boolean }) {
+export function HeadlineList({ items, showTag = false, scores }: { items: Headline[]; showTag?: boolean; scores?: Record<string, ScoredHeadline> }) {
   return (
     <ul className="space-y-1.5">
       {items.map((h) => (
         <li key={h.url} className="text-[12.5px] leading-snug flex gap-1.5">
+          {scores?.[headlineId(h.url, h.title)] && <ImpactBadge impact={scores[headlineId(h.url, h.title)].impact} />}
           {h.source === 'sec' && <FileText size={13} className="shrink-0 mt-[2px]" style={{ color: 'var(--warn)' }} aria-label="SEC filing" />}
           <div className="min-w-0">
             <a className="link" href={h.url} target="_blank" rel="noreferrer">{h.title}</a>
             <div className="muted text-[11.5px]">
               {showTag && h.tag && <span className="chip mr-1.5 !py-0">{h.tag}</span>}
               {h.publisher}{h.date ? ` · ${timeAgo(h.date)}` : ''}
+              {scores?.[headlineId(h.url, h.title)] && <span className="ink2"> · {scores[headlineId(h.url, h.title)].note}</span>}
             </div>
           </div>
         </li>
       ))}
     </ul>
+  )
+}
+
+export function ImpactBadge({ impact }: { impact: number }) {
+  const color = impact > 0 ? 'var(--good)' : impact < 0 ? 'var(--bad)' : 'var(--muted)'
+  return (
+    <span className="chip !px-1.5 !py-0 shrink-0 num self-start mt-[1px]" style={{ color, borderColor: color }} title="Thesis impact, -2 to +2">
+      {impact > 0 ? '+' : ''}{impact}
+    </span>
   )
 }

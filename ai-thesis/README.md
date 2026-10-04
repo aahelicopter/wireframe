@@ -18,6 +18,7 @@ npm run dev     # http://localhost:5174
 
 | Tab | What it does |
 |---|---|
+| **Today** | Daily review: refreshes prices, pulls free news, has Claude score new headlines (batched, titles only), re-plans, and proposes this period's orders for you to approve. Also shows thesis-change suggestions, news signals, and your trading agent's activity. |
 | **Thesis map** | Interactive logic tree. Line thickness shows dollars flowing to each layer. Click a node to read why it matters, its bottleneck and catalysts, and to adjust conviction, scarcity and timing. You can edit the text, add your own sub-theses, or use **Dig deeper with AI** to research the next layer down. |
 | **Plan & buys** | Factor-weight sliders (conviction, bottleneck, beta, depth, purity, small-cap, catalyst) and portfolio rules (number of names, position, branch and cash caps). Shows Buy / Add / Hold suggestions, each with the chain, a plain-English why, and links to news, quotes and filings. |
 | **Deployment** | Splits the buys into monthly or quarterly tranches over the horizon. Names with near-term catalysts are front-loaded. |
@@ -54,6 +55,20 @@ Edits don't change the plan until you hit **Run**. A banner shows when inputs ha
 2. Seven 0–1 factors are blended with your weights. Conviction also scales the total.
 3. The top N names get weight proportional to score^concentration. Then per-name and per-branch caps are applied, and names below the minimum size are dropped.
 4. Targets are compared to your positions to give buy gaps, which are spread across tranches.
+
+## News → thesis → portfolio
+
+1. Each review collects free headlines for holdings, planned buys and the 8 most-funded thesis layers.
+2. Headlines never seen before go to Claude in **one batched call** (titles only, low effort, JSON-schema output). Each headline is sent at most once. Headlines that turn out to be noise are remembered and skipped next time.
+3. Scored headlines become a −1…+1 signal per ticker and per thesis layer, fading with a 7-day half-life. That signal feeds the **News flow** factor (weight on the Plan tab).
+4. A name with a strongly negative signal (≤ −0.5) has new buys paused until the news fades or you act.
+5. When several headlines point the same way, Claude suggests a conviction or scarcity change. You accept or dismiss it; nothing changes on its own.
+
+Token usage and estimated cost are tracked in Settings. A typical review with ~30 new headlines is about 1–2k input tokens.
+
+## Orders and your broker
+
+Reviews turn the current tranche (plus trims and thesis-break exits, if enabled) into **proposed** limit orders. You approve them on the Today tab. A trading agent with your brokerage connection (for example Robinhood) picks up only the approved orders from the local API, places them and reports fills, which update your positions. See [AGENT.md](AGENT.md) for the protocol and safety rules. You can also execute by hand and click **Mark filled**.
 
 ## Data and caveats
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
 import { PriceStatusButton } from './components/PriceStatus'
 import { useAppState } from './lib/store'
@@ -11,10 +11,14 @@ import { PositionsView } from './components/PositionsView'
 import { UniverseView } from './components/UniverseView'
 import { SettingsView } from './components/SettingsView'
 import { NewsView } from './components/NewsView'
+import { ReviewView, isReviewDue } from './components/ReviewView'
+import { useAgentSync } from './lib/agentSync'
+import { runReview, type ReviewResult, type ReviewStep } from './lib/review'
 import { usdK } from './lib/format'
 
-type Tab = 'map' | 'plan' | 'deploy' | 'news' | 'positions' | 'universe' | 'settings'
+type Tab = 'today' | 'map' | 'plan' | 'deploy' | 'news' | 'positions' | 'universe' | 'settings'
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'today', label: 'Today' },
   { id: 'map', label: 'Thesis map' },
   { id: 'plan', label: 'Plan & buys' },
   { id: 'deploy', label: 'Deployment' },
@@ -30,7 +34,7 @@ const DEFAULT_COLLAPSED = ['memory', 'fab', 'cloud', 'accel']
 export default function App() {
   const store = useAppState()
   const { state, plan, stale, run, updateSettings } = store
-  const [tab, setTab] = useState<Tab>('map')
+  const [tab, setTab] = useState<Tab>('today')
   const [selected, setSelected] = useState<string>('lasers')
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(DEFAULT_COLLAPSED))
   const [highlight, setHighlight] = useState<Set<string>>(new Set())
@@ -51,6 +55,31 @@ export default function App() {
     setSelected(id)
     setTab('map')
   }
+
+  const agent = useAgentSync(store)
+  const [reviewStep, setReviewStep] = useState<ReviewStep | null>(null)
+  const [reviewResult, setReviewResult] = useState<ReviewResult | null>(null)
+  const startReview = async () => {
+    if (reviewStep) return
+    setReviewStep('prices')
+    try {
+      setReviewResult(await runReview(store, (st) => setReviewStep(st === 'done' ? null : st)))
+    } finally {
+      setReviewStep(null)
+    }
+  }
+  // Auto-run once per app open when a review is due.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current) return
+    autoRan.current = true
+    if (state.review.autoRun && isReviewDue(store)) {
+      setTab('today')
+      void startReview()
+    }
+  }, [])
+  const pendingOrders = state.orders.filter((o) => o.status === 'proposed').length
+  const reviewDue = isReviewDue(store)
 
   const buys = plan.recommendations.filter((r) => r.gap > 0).length
 
@@ -81,6 +110,9 @@ export default function App() {
           {TABS.map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} className="tab" onClick={() => setTab(t.id)}>
               {t.label}
+              {t.id === 'today' && (pendingOrders > 0 || reviewDue) && (
+                <span className="ml-1.5 chip !py-0 num" style={{ color: 'var(--warn)', borderColor: 'var(--warn)' }}>{pendingOrders > 0 ? pendingOrders : 'due'}</span>
+              )}
               {t.id === 'plan' && stale && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: 'var(--warn)' }} />}
             </button>
           ))}
@@ -88,13 +120,16 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-[1440px] px-4 py-5">
-        {stale && tab !== 'settings' && tab !== 'news' && (
+        {stale && tab !== 'settings' && tab !== 'news' && tab !== 'today' && (
           <div className="mb-4 card px-4 py-2.5 flex items-center justify-between gap-3 text-[13px]" style={{ borderColor: 'var(--warn)' }}>
             <span>You changed the thesis or settings. Hit <b>Run</b> to rebuild the plan.</span>
             <button className="btn btn-primary" onClick={run}><Play size={14} /> Run</button>
           </div>
         )}
 
+        {tab === 'today' && (
+          <ReviewView store={store} agent={agent} running={reviewStep} result={reviewResult} onRun={() => void startReview()} onOpenNode={openNode} />
+        )}
         {tab === 'map' && (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
             <div className="card overflow-auto min-w-0" style={{ maxHeight: 'calc(100vh - 150px)' }}>
@@ -132,7 +167,7 @@ export default function App() {
         {tab === 'news' && <NewsView store={store} onOpenNode={openNode} />}
         {tab === 'positions' && <PositionsView store={store} />}
         {tab === 'universe' && <UniverseView store={store} onOpenNode={openNode} />}
-        {tab === 'settings' && <SettingsView store={store} />}
+        {tab === 'settings' && <SettingsView store={store} agent={agent} />}
       </main>
     </div>
   )

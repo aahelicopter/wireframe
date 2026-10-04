@@ -98,7 +98,7 @@ export function NewsView({ store, onOpenNode }: { store: Store; onOpenNode: (id:
         {loading && items.length === 0 ? (
           <p className="text-[13px] muted inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> Pulling headlines…</p>
         ) : shown.length ? (
-          <HeadlineList items={shown.slice(0, 150)} showTag />
+          <HeadlineList items={shown.slice(0, 150)} showTag scores={state.scored} />
         ) : (
           <p className="text-[13px] muted">No headlines match.</p>
         )}
