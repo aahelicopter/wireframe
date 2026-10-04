@@ -10,13 +10,15 @@ import { DeploymentView } from './components/DeploymentView'
 import { PositionsView } from './components/PositionsView'
 import { UniverseView } from './components/UniverseView'
 import { SettingsView } from './components/SettingsView'
+import { NewsView } from './components/NewsView'
 import { usdK } from './lib/format'
 
-type Tab = 'map' | 'plan' | 'deploy' | 'positions' | 'universe' | 'settings'
+type Tab = 'map' | 'plan' | 'deploy' | 'news' | 'positions' | 'universe' | 'settings'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'map', label: 'Thesis map' },
   { id: 'plan', label: 'Plan & buys' },
   { id: 'deploy', label: 'Deployment' },
+  { id: 'news', label: 'News' },
   { id: 'positions', label: 'Positions' },
   { id: 'universe', label: 'Universe' },
   { id: 'settings', label: 'Settings' },
@@ -86,7 +88,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-[1440px] px-4 py-5">
-        {stale && tab !== 'settings' && (
+        {stale && tab !== 'settings' && tab !== 'news' && (
           <div className="mb-4 card px-4 py-2.5 flex items-center justify-between gap-3 text-[13px]" style={{ borderColor: 'var(--warn)' }}>
             <span>You changed the thesis or settings. Hit <b>Run</b> to rebuild the plan.</span>
             <button className="btn btn-primary" onClick={run}><Play size={14} /> Run</button>
@@ -127,6 +129,7 @@ export default function App() {
         )}
         {tab === 'plan' && <PlanView store={store} onOpenNode={openNode} />}
         {tab === 'deploy' && <DeploymentView store={store} />}
+        {tab === 'news' && <NewsView store={store} onOpenNode={openNode} />}
         {tab === 'positions' && <PositionsView store={store} />}
         {tab === 'universe' && <UniverseView store={store} onOpenNode={openNode} />}
         {tab === 'settings' && <SettingsView store={store} />}

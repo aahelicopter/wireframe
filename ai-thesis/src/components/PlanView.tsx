@@ -159,7 +159,8 @@ function RecCard({ r, total, color, chain, apiKey, quote, onOpenNode }: {
           {c && (
             <NewsBox apiKey={apiKey} subject={`${c.name} (${c.ticker})`}
               context={r.why.slice(0, 2).join(' ')}
-              query={`${c.name} ${c.ticker}`}
+              query={`"${c.name}"`}
+              company={{ ticker: c.ticker, yahoo: c.yahoo, usListed: c.usListed }}
               extraLinks={[
                 { label: 'Quote', href: quoteUrl(c.yahoo) },
                 ...(c.usListed ? [{ label: 'SEC filings', href: filingsUrl(c.ticker) }] : []),
