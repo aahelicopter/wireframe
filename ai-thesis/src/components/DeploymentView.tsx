@@ -30,7 +30,7 @@ export function DeploymentView({ store }: { store: Store }) {
           <h3 className="text-[14px] font-semibold">Buy schedule: {usdK(plan.totalBuys)} over {state.settings.horizonMonths} months</h3>
           <span className="text-[12px] muted">{state.settings.cadence} tranches · names with near-term catalysts are front-loaded {Math.round(state.settings.frontLoad * 100)}%</span>
         </div>
-        <p className="text-[12.5px] ink2 mb-4">Each name is built up across tranches rather than bought at once. Re-run each tranche date with fresh prices and positions, and the schedule re-balances to whatever is still missing.</p>
+        <p className="text-[12.5px] ink2 mb-4">Each name is built up across tranches rather than bought at once. Share counts use today's live price. On each tranche date, update your positions and re-run, and the schedule re-balances to whatever is still missing.</p>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] mb-2">
           {legend.map((id) => (
             <span key={id} className="inline-flex items-center gap-1.5 ink2">
@@ -77,6 +77,7 @@ export function DeploymentView({ store }: { store: Store }) {
                         <span className="inline-block h-2 w-2 rounded-sm mr-1.5" style={{ background: colors[branchOf.get(b.ticker) ?? ''] }} />
                         {b.ticker}
                       </td>
+                      <td className="text-right muted">{state.quotes[b.ticker] ? `≈${Math.max(1, Math.round(b.amount / state.quotes[b.ticker].priceUsd)).toLocaleString()} sh` : ''}</td>
                       <td className="text-right">{usd(b.amount)}</td>
                     </tr>
                   ))}

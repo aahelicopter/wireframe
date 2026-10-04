@@ -4,6 +4,7 @@ import type { Store } from '../lib/store'
 import type { CapSize, Company } from '../types'
 import { indexTree, pathTo } from '../engine/tree'
 import { quoteUrl, usdK } from '../lib/format'
+import { DayChange } from './PriceStatus'
 
 export function UniverseView({ store, onOpenNode }: { store: Store; onOpenNode: (id: string) => void }) {
   const { state, plan, update } = store
@@ -33,11 +34,12 @@ export function UniverseView({ store, onOpenNode }: { store: Store; onOpenNode: 
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="w-full text-[13px] num min-w-[900px]">
+        <table className="w-full text-[13px] num min-w-[980px]">
           <thead>
             <tr className="text-left label border-b" style={{ borderColor: 'var(--border)' }}>
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Company</th>
+              <th className="px-3 py-2 text-right">Price</th>
               <th className="px-3 py-2">Thesis nodes</th>
               <th className="px-3 py-2 w-20">β est.</th>
               <th className="px-3 py-2 w-24">Size</th>
@@ -56,6 +58,14 @@ export function UniverseView({ store, onOpenNode }: { store: Store; onOpenNode: 
                     <a className="link font-semibold" href={quoteUrl(c.yahoo)} target="_blank" rel="noreferrer">{c.ticker}</a>
                     <div className="text-[12px] ink2">{c.name}</div>
                     {c.note && <div className="text-[11.5px]" style={{ color: 'var(--warn)' }}>{c.note}</div>}
+                  </td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {state.quotes[c.ticker] ? (
+                      <>
+                        <div>${state.quotes[c.ticker].priceUsd.toFixed(2)}</div>
+                        <div className="text-[11.5px]"><DayChange pct={state.quotes[c.ticker].changePct} /></div>
+                      </>
+                    ) : <span className="muted">–</span>}
                   </td>
                   <td className="px-3 py-2 text-[12px]">
                     {c.exposures.map((e) => (

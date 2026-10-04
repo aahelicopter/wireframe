@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
+import { PriceStatusButton } from './components/PriceStatus'
 import { useAppState } from './lib/store'
 import { indexTree } from './engine/tree'
 import { ThesisTree } from './components/ThesisTree'
@@ -64,6 +65,7 @@ export default function App() {
             <input className="input !w-32 num" type="number" step={10000} value={state.settings.capital}
               onChange={(e) => updateSettings({ capital: Math.max(0, Number(e.target.value)) })} />
           </label>
+          <PriceStatusButton store={store} />
           <div className="flex items-center gap-3">
             <span className="text-[12px] muted num hidden md:inline">
               {stale ? 'Inputs changed since last run' : `Last run ${new Date(plan.ranAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${buys} buys`}

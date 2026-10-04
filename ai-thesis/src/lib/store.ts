@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_COMPANIES } from '../data/companies'
 import { DEFAULT_NODES } from '../data/thesis'
 import { runPlan } from '../engine/allocate'
 import type { Company, PlanResult, Position, Settings, ThesisNode } from '../types'
+import { fetchQuotes, type Quote } from './prices'
 
 export const DEFAULT_SETTINGS: Settings = {
   capital: 500_000,
@@ -28,7 +29,19 @@ export interface AppState {
   positions: Position[]
   settings: Settings
   apiKey: string
+  /** Latest live quotes, keyed by app ticker. */
+  quotes: Record<string, Quote>
+  quotesAt: string | null
+  /** Re-fetch prices every few minutes while the app is open. */
+  liveRefresh: boolean
 }
+
+export interface PriceStatus {
+  busy: boolean
+  errors: string[]
+}
+
+const REFRESH_MS = 5 * 60 * 1000
 
 const KEY = 'ai-thesis-portfolio:v1'
 
@@ -39,6 +52,9 @@ function load(): AppState {
     positions: [],
     settings: DEFAULT_SETTINGS,
     apiKey: '',
+    quotes: {},
+    quotesAt: null,
+    liveRefresh: true,
   }
   try {
     const raw = localStorage.getItem(KEY)
@@ -79,6 +95,75 @@ export function useAppState() {
 
   const stale = useMemo(() => planKey(state) !== planInputs, [state, planInputs])
 
+  // ---- Live prices ----
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const staleRef = useRef(stale)
+  staleRef.current = stale
+  const [priceStatus, setPriceStatus] = useState<PriceStatus>({ busy: false, errors: [] })
+  const [runAfterRefresh, setRunAfterRefresh] = useState(false)
+  const busyRef = useRef(false)
+
+  const refreshPrices = useCallback(async () => {
+    if (busyRef.current) return
+    busyRef.current = true
+    setPriceStatus({ busy: true, errors: [] })
+    try {
+      const s = stateRef.current
+      const symbolOf = new Map(s.companies.map((c) => [c.ticker, c.yahoo]))
+      const tickers = new Set([
+        ...s.positions.map((p) => p.ticker.trim().toUpperCase()).filter(Boolean),
+        ...s.companies.map((c) => c.ticker),
+      ])
+      const pairs = [...tickers].map((t) => [t, symbolOf.get(t) ?? t] as const)
+      const { quotes, errors } = await fetchQuotes(pairs.map(([, sym]) => sym))
+      const byTicker: Record<string, Quote> = {}
+      for (const [t, sym] of pairs) if (quotes[sym]) byTicker[t] = quotes[sym]
+      if (!Object.keys(byTicker).length) {
+        setPriceStatus({ busy: false, errors: errors.length ? errors : ['No prices returned'] })
+        return
+      }
+      const wasCurrent = !staleRef.current
+      setState((prev) => ({
+        ...prev,
+        quotes: { ...prev.quotes, ...byTicker },
+        quotesAt: new Date().toISOString(),
+        positions: prev.positions.map((p) => {
+          const q = byTicker[p.ticker.trim().toUpperCase()]
+          return q && p.priceSource !== 'manual'
+            ? { ...p, price: Math.round(q.priceUsd * 10000) / 10000, priceSource: 'live' as const }
+            : p
+        }),
+      }))
+      // If the plan was up to date, keep it that way with the new prices.
+      if (wasCurrent) setRunAfterRefresh(true)
+      setPriceStatus({ busy: false, errors })
+    } catch (e) {
+      setPriceStatus({ busy: false, errors: [e instanceof Error ? e.message : String(e)] })
+    } finally {
+      busyRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!runAfterRefresh) return
+    setRunAfterRefresh(false)
+    run()
+  }, [runAfterRefresh, run])
+
+  // Fetch on open if prices are older than the refresh interval, then on a timer.
+  useEffect(() => {
+    const at = stateRef.current.quotesAt
+    if (!at || Date.now() - new Date(at).getTime() > REFRESH_MS) void refreshPrices()
+  }, [refreshPrices])
+  useEffect(() => {
+    if (!state.liveRefresh) return
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshPrices()
+    }, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [state.liveRefresh, refreshPrices])
+
   const update = useCallback((patch: Partial<AppState> | ((s: AppState) => Partial<AppState>)) => {
     setState((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }))
   }, [])
@@ -95,11 +180,11 @@ export function useAppState() {
     setState((s) =>
       what === 'thesis'
         ? { ...s, nodes: DEFAULT_NODES, companies: DEFAULT_COMPANIES }
-        : { nodes: DEFAULT_NODES, companies: DEFAULT_COMPANIES, positions: [], settings: DEFAULT_SETTINGS, apiKey: s.apiKey },
+        : { ...s, nodes: DEFAULT_NODES, companies: DEFAULT_COMPANIES, positions: [], settings: DEFAULT_SETTINGS },
     )
   }, [])
 
-  return { state, plan, stale, run, update, updateNode, updateSettings, reset }
+  return { state, plan, stale, run, update, updateNode, updateSettings, reset, refreshPrices, priceStatus }
 }
 
 export type Store = ReturnType<typeof useAppState>

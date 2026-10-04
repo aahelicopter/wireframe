@@ -6,6 +6,8 @@ import { branchColors, filingsUrl, quoteUrl, usdK } from '../lib/format'
 import { indexTree, pathTo } from '../engine/tree'
 import { WeightsPanel } from './WeightsPanel'
 import { NewsBox } from './NewsBox'
+import { DayChange } from './PriceStatus'
+import type { Quote } from '../lib/prices'
 
 const ACTION_STYLE: Record<Action, { label: string; color: string }> = {
   BUY: { label: 'Buy', color: 'var(--good)' },
@@ -86,7 +88,7 @@ export function PlanView({ store, onOpenNode }: { store: Store; onOpenNode: (id:
         <div className="space-y-2">
           {recs.map((r) => (
             <RecCard key={r.ticker} r={r} total={total} color={r.scored ? colors[r.scored.branchId] : 'var(--muted)'}
-              chain={r.scored ? pathTo(idx, r.scored.primaryNodeId).slice(1) : []} apiKey={state.apiKey} onOpenNode={onOpenNode} />
+              chain={r.scored ? pathTo(idx, r.scored.primaryNodeId).slice(1) : []} apiKey={state.apiKey} quote={state.quotes[r.ticker]} onOpenNode={onOpenNode} />
           ))}
           {recs.length === 0 && <p className="muted text-[13px]">Nothing matches this filter.</p>}
         </div>
@@ -105,8 +107,8 @@ function Tile({ label, value, sub }: { label: string; value: string; sub: string
   )
 }
 
-function RecCard({ r, total, color, chain, apiKey, onOpenNode }: {
-  r: Recommendation; total: number; color: string; chain: { id: string; label: string }[]; apiKey: string; onOpenNode: (id: string) => void
+function RecCard({ r, total, color, chain, apiKey, quote, onOpenNode }: {
+  r: Recommendation; total: number; color: string; chain: { id: string; label: string }[]; apiKey: string; quote?: Quote; onOpenNode: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const c = r.scored?.company
@@ -124,6 +126,11 @@ function RecCard({ r, total, color, chain, apiKey, onOpenNode }: {
             <span className="chip" style={{ color: a.color, borderColor: a.color }}>{a.label}</span>
             {c && !c.usListed && <span className="chip">non-US</span>}
             {c?.origin === 'ai' && <span className="chip">AI-added</span>}
+            {quote && (
+              <span className="text-[12px] num ink2" title={`Last trade ${new Date(quote.time).toLocaleString()}`}>
+                ${quote.priceUsd.toFixed(2)} <DayChange pct={quote.changePct} />
+              </span>
+            )}
           </div>
           <div className="text-[12px] muted truncate">{chain.map((n) => n.label).join(' → ')}</div>
         </div>
@@ -133,9 +140,12 @@ function RecCard({ r, total, color, chain, apiKey, onOpenNode }: {
           </div>
           <div className="h-1.5 rounded-full -mt-1.5" style={{ width: `${(r.currentValue / maxV) * 100}%`, background: color }} />
         </div>
-        <div className="text-right num shrink-0 w-28">
+        <div className="text-right num shrink-0 w-36">
           <div className="text-[14px] font-semibold">{r.gap > 0 ? `+${usdK(r.gap)}` : r.gap < 0 ? usdK(r.gap) : usdK(r.currentValue)}</div>
-          <div className="text-[11.5px] muted">{r.targetValue > 0 ? `${((r.targetValue / total) * 100).toFixed(1)}% target` : 'no target'}</div>
+          <div className="text-[11.5px] muted">
+            {r.targetValue > 0 ? `${((r.targetValue / total) * 100).toFixed(1)}% target` : 'no target'}
+            {quote && r.gap !== 0 && ` · ≈${Math.abs(Math.round(r.gap / quote.priceUsd)).toLocaleString()} sh`}
+          </div>
         </div>
       </button>
       {open && (

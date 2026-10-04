@@ -48,8 +48,10 @@ export interface Position {
   ticker: string
   shares: number
   avgCost: number
-  /** Last price, entered by the user. Falls back to avgCost. */
+  /** Last price in USD. Filled from live quotes unless the user typed one. Falls back to avgCost. */
   price: number
+  /** 'manual' prices are never overwritten by live quotes. */
+  priceSource?: 'live' | 'manual'
 }
 
 export type FactorKey =
