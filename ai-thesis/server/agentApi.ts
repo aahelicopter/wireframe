@@ -179,7 +179,7 @@ export function agentApi(): Plugin {
         const approved = s.orders.filter((o) => o.status === 'approved')
         return send(res, 200, {
           instructions:
-            'Place each order exactly as given: limit order, day time-in-force, qty in shares (may be fractional). Then POST /api/agent/orders/{id} with {"status":"sent"|"filled"|"failed", "fill":{"qty":n,"avgPrice":n}, "brokerOrderId":"...", "note":"..."}. Do not place anything that is not in this list.',
+            'Place each order exactly as given: orderType limit (whole shares, limit_price=limitPrice) or market (fractional qty; skip if ask > limitPrice), time_in_force gfd, regular hours, ref_id = order id. Review it first and mark it failed on any broker alert. Then POST /api/agent/orders/{id} with {"status":"sent"|"filled"|"failed", "fill":{"qty":n,"avgPrice":n}, "brokerOrderId":"...", "note":"..."}. Do not place anything that is not in this list.',
           orders: approved,
         })
       }

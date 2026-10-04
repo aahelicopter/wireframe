@@ -6,7 +6,8 @@ const LIVE: Order['status'][] = ['approved', 'sent', 'filled']
 /** News signal at or below this pauses new buys of a name. */
 export const PAUSE_BELOW = -0.5
 
-const newId = () => `o_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+/** UUID, so agents can pass it straight through as the broker's idempotency key (Robinhood ref_id). */
+const newId = () => crypto.randomUUID()
 
 /** End of the next calendar day, local time. Approved orders not sent by then expire. */
 function expiry(now: Date) {
@@ -61,7 +62,8 @@ export function buildOrders(
     const q = quotes[ticker]
     if (!q) return skipped.push({ ticker, reason: 'No live price. Refresh prices first.' })
     const price = q.priceUsd
-    let qty = trading.fractional ? Math.floor((dollars / price) * 10000) / 10000 : Math.floor(dollars / price)
+    // Robinhood takes up to 6 decimals on fractional (market) orders.
+    let qty = trading.fractional ? Math.floor((dollars / price) * 1e6) / 1e6 : Math.floor(dollars / price)
     if (maxQty !== undefined) qty = Math.min(qty, maxQty)
     if (qty <= 0) return skipped.push({ ticker, reason: `Under one share at $${price.toFixed(2)}. Turn on fractional shares.` })
     const notional = round2(qty * price)
@@ -74,6 +76,7 @@ export function buildOrders(
       qty,
       notional,
       refPrice: round2(price),
+      orderType: trading.fractional && !Number.isInteger(qty) ? 'market' : 'limit',
       limitPrice: round2(side === 'BUY' ? price * (1 + buffer) : price * (1 - buffer)),
       kind,
       reason,
@@ -125,7 +128,7 @@ export function applyFill(positions: Position[], o: Order, fill: { qty: number; 
   const idx = positions.findIndex((p) => p.ticker.trim().toUpperCase() === o.ticker)
   if (o.side === 'BUY') {
     if (idx < 0) {
-      return [...positions, { id: `p_${o.id}`, ticker: o.ticker, shares: fill.qty, avgCost: fill.avgPrice, price: fill.avgPrice }]
+      return [...positions, { id: `p_${o.id.slice(0, 8)}`, ticker: o.ticker, shares: fill.qty, avgCost: fill.avgPrice, price: fill.avgPrice }]
     }
     return positions.map((p, i) => {
       if (i !== idx) return p

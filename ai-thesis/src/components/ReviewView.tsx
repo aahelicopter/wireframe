@@ -162,7 +162,7 @@ export function ReviewView({ store, agent, running, result, onRun, onOpenNode }:
                   <th className="px-3 py-2">Side</th>
                   <th className="px-3 py-2">Ticker</th>
                   <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">Limit</th>
+                  <th className="px-3 py-2 text-right">Limit / guard</th>
                   <th className="px-3 py-2 text-right">≈ Value</th>
                   <th className="px-3 py-2">Why</th>
                 </tr>
@@ -176,8 +176,12 @@ export function ReviewView({ store, agent, running, result, onRun, onOpenNode }:
                     </td>
                     <td className="px-3 py-1.5 font-semibold" style={{ color: o.side === 'BUY' ? 'var(--good)' : 'var(--bad)' }}>{o.side}</td>
                     <td className="px-3 py-1.5 font-semibold">{o.ticker}</td>
-                    <td className="px-3 py-1.5 w-28"><input className="input text-right" type="number" step="any" value={o.qty} onChange={(e) => edit(o.id, { qty: Number(e.target.value) })} /></td>
-                    <td className="px-3 py-1.5 w-28"><input className="input text-right" type="number" step="0.01" value={o.limitPrice} onChange={(e) => edit(o.id, { limitPrice: Number(e.target.value) })} /></td>
+                    <td className="px-3 py-1.5 w-28"><input className="input text-right" type="number" step="any" value={o.qty}
+                      onChange={(e) => { const qty = Number(e.target.value); edit(o.id, { qty, orderType: Number.isInteger(qty) ? 'limit' : 'market' }) }} /></td>
+                    <td className="px-3 py-1.5 w-32">
+                      <input className="input text-right" type="number" step="0.01" value={o.limitPrice} onChange={(e) => edit(o.id, { limitPrice: Number(e.target.value) })} />
+                      <div className="text-[10.5px] muted text-right">{o.orderType === 'market' ? 'market, fractional' : 'limit'}</div>
+                    </td>
                     <td className="px-3 py-1.5 text-right">{usd(o.notional)}</td>
                     <td className="px-3 py-1.5 text-[12px] ink2">{o.reason}</td>
                   </tr>
@@ -189,7 +193,7 @@ export function ReviewView({ store, agent, running, result, onRun, onOpenNode }:
             </table>
           </div>
           <p className="px-4 py-2.5 text-[11.5px] muted">
-            Approved orders are limit orders good for the day and expire at the end of the next day. Your agent can only see and place approved orders. It can't create or resize them.
+            Whole-share orders are day limit orders. Fractional quantities go as market orders, because Robinhood only allows fractional shares on market orders; the agent skips one if the ask is above the guard price. Approved orders expire at the end of the next day. Your agent can only see and place approved orders. It can't create or resize them.
           </p>
         </div>
 

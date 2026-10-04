@@ -181,6 +181,12 @@ export interface Order {
   notional: number
   /** Price used to size the order. */
   refPrice: number
+  /**
+   * Robinhood: limit orders must be whole shares; fractional shares are only
+   * allowed as market orders in regular hours. For market orders, limitPrice
+   * is a price guard the agent checks against the ask before placing.
+   */
+  orderType: 'limit' | 'market'
   limitPrice: number
   kind: 'tranche' | 'trim' | 'exit'
   reason: string

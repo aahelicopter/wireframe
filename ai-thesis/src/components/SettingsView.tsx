@@ -99,7 +99,7 @@ export function SettingsView({ store, agent }: { store: Store; agent: AgentLink 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2 text-[13px]">
             <div className="label">Order preferences</div>
-            <label className="flex items-center gap-2"><input type="checkbox" style={{ accentColor: 'var(--accent)' }} checked={t.fractional} onChange={(e) => setTrading({ fractional: e.target.checked })} /> Fractional shares</label>
+            <label className="flex items-center gap-2"><input type="checkbox" style={{ accentColor: 'var(--accent)' }} checked={t.fractional} onChange={(e) => setTrading({ fractional: e.target.checked })} /> Fractional shares (sent as market orders with a price guard, since Robinhood doesn't allow fractional limit orders)</label>
             <label className="flex items-center gap-2"><input type="checkbox" style={{ accentColor: 'var(--accent)' }} checked={t.exitOnThesisBreak} onChange={(e) => setTrading({ exitOnThesisBreak: e.target.checked })} /> Propose selling a holding when its whole thesis is switched off</label>
             <label className="flex items-center justify-between gap-3">Limit buffer vs last price
               <span className="flex items-center gap-1"><input className="input !w-20 text-right" type="number" step="0.1" min={0} value={t.limitBufferPct} onChange={(e) => setTrading({ limitBufferPct: Number(e.target.value) })} />%</span>
@@ -140,19 +140,24 @@ export function SettingsView({ store, agent }: { store: Store; agent: AgentLink 
 }
 
 function agentPrompt(origin: string, token: string) {
-  return `You execute pre-approved stock orders for my AI thesis portfolio app. Use my brokerage connection (Robinhood).
+  return `You execute pre-approved stock orders for my AI thesis portfolio app, using the Robinhood MCP tools.
 
-API base: ${origin}/api/agent  (header: Authorization: Bearer ${token})
+App API: ${origin}/api/agent  (header: Authorization: Bearer ${token})
+Robinhood account: the one account get_accounts lists as tradable by you (my Agentic account). Never use any other account for orders.
 
 Each run:
-1. GET /status. If approvedOrders is 0, stop.
+1. GET /status. If approvedOrders is 0, skip to step 4.
 2. GET /orders. For EACH order listed, and nothing else:
-   - Place exactly: side, ticker, qty (fractional allowed), LIMIT price = limitPrice, time in force = day.
-   - Then POST /orders/{id} with {"status":"sent","brokerOrderId":"..."}.
-   - If the broker rejects it, POST {"status":"failed","note":"<reason>"}.
-3. Later runs: for orders you sent, check the broker. When filled, POST {"status":"filled","fill":{"qty":<filled qty>,"avgPrice":<avg price>},"brokerOrderId":"..."}.
-4. After trading, PUT /positions with {"positions":[{"ticker":"LITE","shares":12.5,"avgCost":98.2}, ...]} from my broker holdings.
-5. Optionally GET /brief and send me the summary.
+   a. get_equity_tradability for the symbol. If it isn't tradable, POST /orders/{id} {"status":"failed","note":"not tradable"}.
+   b. get_equity_quotes. BUY: if ask > limitPrice, mark failed with note "price above guard". SELL: if bid < limitPrice, mark failed.
+   c. review_equity_order with exactly: side, symbol=ticker, quantity=qty, time_in_force="gfd", market_hours="regular_hours",
+      and type="limit" + limit_price=limitPrice when orderType is "limit", or type="market" (no limit_price) when orderType is "market".
+      If the review returns any alert (buying power, PDT, halt), mark failed with the alert text. Don't place it.
+   d. place_equity_order with the same parameters and ref_id = the order's id (it is a UUID; reuse it on retries).
+   e. POST /orders/{id} {"status":"sent","brokerOrderId":"<robinhood order id>"}.
+3. For orders you sent earlier, get_equity_orders with order_id. When filled, POST /orders/{id} {"status":"filled","fill":{"qty":<filled qty>,"avgPrice":<average price>},"brokerOrderId":"..."}. If cancelled or rejected, POST failed with the reason.
+4. get_equity_positions for the Agentic account, then PUT /positions {"positions":[{"ticker":..,"shares":..,"avgCost":average_buy_price}]}.
+5. GET /brief and send me a short summary.
 
-Rules: never place an order that isn't in GET /orders. Never change qty, side or limit. Never market orders. If anything looks wrong (price moved more than 3% from limitPrice, ticker not found), mark it failed with a note instead of improvising.`
+Rules: never place an order that isn't returned by GET /orders. Never change side, qty, type or limit. If anything is unclear, mark the order failed with a note instead of improvising.`
 }

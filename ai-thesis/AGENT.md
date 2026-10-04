@@ -41,6 +41,25 @@ Each order has `side` (BUY/SELL), `ticker`, `qty` (shares, fractional only if yo
 
 The app must be running (`npm run dev`) for the agent to reach it.
 
-## Robinhood notes
+## Robinhood (official MCP: `agent.robinhood.com/mcp/trading`)
 
-This app doesn't talk to Robinhood itself. Everything broker-specific lives in your agent. Check what your Robinhood connection supports, especially limit orders on fractional shares (keep **Fractional shares** off in Settings if it can't), extended hours, and non-US listings (the app already skips those).
+Checked against the live Robinhood MCP tool definitions:
+
+| App order field | Robinhood `place_equity_order` |
+|---|---|
+| `id` (UUID) | `ref_id` (idempotency key, re-send on retries) |
+| `side` BUY/SELL | `side` buy/sell |
+| `ticker` | `symbol` |
+| `qty` | `quantity` (string) |
+| `orderType` limit | `type: "limit"`, `limit_price` = `limitPrice` (whole shares only) |
+| `orderType` market | `type: "market"`, no limit price. Fractional, regular hours only, up to 6 decimals. The agent checks the ask against `limitPrice` first. |
+| (fixed) | `time_in_force: "gfd"`, `market_hours: "regular_hours"` |
+| (agent picks) | `account_number`: the single account `get_accounts` marks as agent-tradable (your **Agentic** account) |
+
+Agent flow per order: `get_equity_tradability`, then `get_equity_quotes` (price guard), then `review_equity_order`, which simulates the order and returns pre-trade alerts such as buying power, PDT or halts. Only then `place_equity_order`. Afterwards it polls `get_equity_orders(order_id)` for fills and reads `get_equity_positions` (Agentic account) for the sync.
+
+Things to know:
+- Agents can only trade in the **Agentic** account. Your main account is read-only to them, so the thesis money has to be deposited into the Agentic account.
+- Fractional shares only work as market orders in regular hours. That's why the app defaults to whole-share limit orders.
+- Some names can't trade outside regular hours (e.g. AXTI); the app already uses regular hours.
+- Settings → Trading agent → "Copy agent instructions" gives a ready-made prompt that follows this flow.

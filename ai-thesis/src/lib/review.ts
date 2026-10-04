@@ -165,7 +165,7 @@ function buildBrief(
   L.push(`## Orders awaiting approval (${pending.length})`)
   if (pending.length) {
     L.push('| Side | Ticker | Qty | Limit | ≈ $ | Why |', '|---|---|---|---|---|---|')
-    for (const o of pending) L.push(`| ${o.side} | ${o.ticker} | ${o.qty} | ${o.limitPrice.toFixed(2)} | ${money(o.notional)} | ${o.reason} |`)
+    for (const o of pending) L.push(`| ${o.side} | ${o.ticker} | ${o.qty} | ${o.orderType === 'market' ? 'mkt, guard ' : ''}${o.limitPrice.toFixed(2)} | ${money(o.notional)} | ${o.reason} |`)
     L.push(`\nTotal buys ${money(pending.filter((o) => o.side === 'BUY').reduce((a, o) => a + o.notional, 0))}, sells ${money(pending.filter((o) => o.side === 'SELL').reduce((a, o) => a + o.notional, 0))}. Approve in the app's Today tab.`)
   } else L.push('None this period.')
   L.push('')
