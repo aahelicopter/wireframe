@@ -1,5 +1,7 @@
 # SoxHub - Audit Control Management MVP
 
+> Also in this repo: [`ai-thesis/`](ai-thesis/README.md), an AI supply-chain thesis portfolio planner (separate Vite app).
+
 A modern audit control management system demonstrating multi-framework control mapping, where one control can satisfy SOX, SOC 2, and ISO 27001 simultaneously.
 
 ## Key Features
